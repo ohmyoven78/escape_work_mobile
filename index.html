@@ -1,0 +1,3285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#3e2410" />
+  <title>살아남아 퇴근하기</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏝️</text></svg>" />
+
+  <!-- Phaser 3: CDN 우선, 실패 시 같은 폴더의 phaser.min.js 사용 (발표장 인터넷 불안정 대비) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+  <script>window.Phaser || document.write('<script src="phaser.min.js"><\/script>');</script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #2a1a0e; color: #4a2c17;
+      overflow: hidden; overscroll-behavior: none;
+      font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    }
+    #game { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+    #game canvas { touch-action: none; display: block; }
+
+    /* ── 공통: 양피지 카드 + 우드 테두리 (Kenney Adventure 톤) ── */
+    .card {
+      margin: auto; width: min(400px, 100%);
+      background: #f5e6c8;
+      border: 6px solid #8b5a2b; border-radius: 22px;
+      box-shadow:
+        0 0 0 3px #3e2410,
+        inset 0 7px 0 #e2cc9f,
+        0 18px 50px rgba(0,0,0,.55);
+      padding: 26px 22px 22px; text-align: center; position: relative;
+    }
+    .card::before {
+      content: ""; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      width: 54px; height: 9px; border-radius: 9px; background: #8b5a2b; box-shadow: 0 0 0 2px #3e2410;
+    }
+    .emoji { font-size: 44px; margin-top: 6px; }
+    h1 { font-size: 27px; font-weight: 900; letter-spacing: -0.02em; margin-top: 4px; color: #4a2c17; }
+    h1 span { color: #c2410c; }
+    .sub { color: #6b5440; font-size: 14px; margin-top: 6px; line-height: 1.5; }
+    form { margin-top: 16px; }
+    label { display: block; text-align: left; font-size: 13px; color: #6b4423; margin-bottom: 6px; font-weight: 800; }
+    .input-wrap { position: relative; }
+    input {
+      width: 100%; font-size: 18px;
+      padding: 14px 64px 14px 16px; border-radius: 12px;
+      border: 3px solid #a47148; background: #fffaf0; color: #3b2a1a;
+      box-shadow: inset 0 3px 0 rgba(74,44,23,.12);
+      -webkit-user-select: text; user-select: text;
+    }
+    input::placeholder { color: #b59a78; }
+    input:focus { border-color: #e8a33d; outline: none; }
+    .suffix { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #8a6a4a; font-size: 16px; font-weight: 700; pointer-events: none; }
+
+    /* 3D 모바일 버튼: 위는 밝고 아래는 어두운 음영, 누르면 쑥 들어감 */
+    button {
+      width: 100%; margin-top: 16px; padding: 13px;
+      font-size: 18px; font-weight: 900; font-family: inherit;
+      border: 3px solid #3e2410; border-radius: 14px;
+      background: linear-gradient(#ffe08a 0 42%, #ffc53d 42%);
+      color: #4a2c17;
+      box-shadow: 0 5px 0 #c98a12, 0 8px 0 #3e2410;
+      cursor: pointer; transition: transform .06s, box-shadow .06s, opacity .2s;
+    }
+    button:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 #c98a12, 0 4px 0 #3e2410; }
+    button:disabled { opacity: .45; }
+    button.ghost { background: linear-gradient(#b07a44 0 42%, #8b5a2b 42%); color: #fdf2d8; box-shadow: 0 5px 0 #5a381c, 0 8px 0 #3e2410; }
+    button.ghost:active { box-shadow: 0 1px 0 #5a381c, 0 4px 0 #3e2410; }
+    .error { color: #b3261e; font-size: 13px; font-weight: 700; min-height: 18px; margin-top: 12px; }
+    .tip { color: #8a6a4a; font-size: 12px; margin-top: 2px; }
+
+    /* ── 시작 모달: 노을 바다 배경 ── */
+    #start-modal {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; overflow-y: auto; padding: 16px;
+      background:
+        radial-gradient(260px 260px at 50% 62%, rgba(255,210,122,.55), transparent 70%),
+        linear-gradient(#1e2a5a 0%, #8a5a7a 38%, #f4a261 62%, #2a9d8f 62.5%, #1d6f8a 100%);
+      transition: opacity .35s ease;
+    }
+    #start-modal.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── 세로 화면 안내 ── */
+    #rotate-hint {
+      display: none; position: fixed; inset: 0; z-index: 30;
+      background: rgba(42,26,14,.97); color: #fdf2d8;
+      flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+      text-align: center; font-size: 18px; font-weight: 700; padding: 24px;
+    }
+    #rotate-hint .phone { font-size: 64px; animation: rotate 1.8s ease-in-out infinite; }
+    #rotate-hint small { color: #d9c08f; font-weight: 400; font-size: 14px; }
+    @keyframes rotate { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+    @media (orientation: portrait) and (pointer: coarse) {
+      body.playing #rotate-hint { display: flex; }
+    }
+
+    /* ── 무전기 암호 팝업: 키보드가 화면 아래 절반을 덮어도 보이도록 최상단에 붙인 한 줄짜리 패널 ── */
+    #pw-modal {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(20, 12, 6, 0.55);
+      overscroll-behavior: none; touch-action: none;
+    }
+    #pw-modal.hidden { display: none; }
+    .pw-card {
+      position: fixed; z-index: 10000;
+      top: max(6px, 3vh); left: 50%; transform: translateX(-50%);
+      width: min(600px, calc(100vw - 16px));
+      background: #f5e6c8; border: 4px solid #8b5a2b; border-radius: 14px;
+      box-shadow: 0 0 0 2px #3e2410, inset 0 4px 0 #e2cc9f, 0 10px 28px rgba(0,0,0,.5);
+      padding: 7px 10px 9px; text-align: left; touch-action: manipulation;
+    }
+    .pw-head { display: flex; align-items: baseline; gap: 8px; font-size: 15px; font-weight: 900; color: #4a2c17; line-height: 1.3; }
+    .pw-head small { font-size: 12px; font-weight: 800; color: #9a3412; }
+    .pw-q { margin: 1px 0 6px; font-size: 13px; line-height: 1.35; color: #6b4423; font-weight: 700; }
+    .pw-row { display: flex; gap: 6px; align-items: center; margin: 0; }
+    .pw-row input {
+      flex: 1 1 auto; min-width: 0;
+      font-size: 16px;                      /* 16px 미만이면 iOS가 화면을 확대함 */
+      padding: 8px 10px; border-width: 2px; border-radius: 10px;
+      text-align: center; font-weight: 800; letter-spacing: 0.08em;
+    }
+    .pw-row button {
+      flex: 0 0 auto; width: auto; margin: 0 0 5px; padding: 8px 14px;
+      font-size: 15px; border-width: 2px; border-radius: 10px;
+      box-shadow: 0 3px 0 #c98a12, 0 5px 0 #3e2410;
+    }
+    .pw-row button.ghost { box-shadow: 0 3px 0 #5a381c, 0 5px 0 #3e2410; }
+    .pw-row button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 #c98a12, 0 2px 0 #3e2410; }
+    #pw-msg { margin-top: 4px; min-height: 0; font-size: 12.5px; line-height: 1.35; }
+    #pw-msg:empty { display: none; }
+    .msg.ok { color: #2f7d32; }
+    .msg.err { color: #b3261e; }
+    .shake { animation: shake .35s; }
+    @keyframes shake { 0%,100% { transform: translateX(-50%); } 20%,60% { transform: translateX(calc(-50% - 8px)); } 40%,80% { transform: translateX(calc(-50% + 8px)); } }
+    body.pw-open { position: fixed; inset: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+
+  <div id="start-modal">
+    <div class="card">
+      <div class="emoji">🏝️</div>
+      <h1>살아남아 <span>퇴근하기</span></h1>
+      <p class="sub">낚시 워크숍 가던 통통배가 난파됐다.<br/>무인도에서 살아남아 무사히 퇴근하자!</p>
+      <form id="start-form" autocomplete="off">
+        <label for="player-name">사원 이름을 입력하세요</label>
+        <div class="input-wrap">
+          <input id="player-name" type="text" maxlength="20" placeholder="예) 김철수" enterkeyhint="go" />
+          <span class="suffix">사원</span>
+        </div>
+        <button id="start-btn" type="submit" disabled>🏢 출근하기</button>
+        <div class="error" id="start-error"></div>
+        <p class="tip">가로 화면으로 플레이하면 더 편해요</p>
+      </form>
+    </div>
+  </div>
+
+  <div id="rotate-hint">
+    <div class="phone">📱</div>
+    휴대폰을 가로로 돌려주세요
+    <small>화면 회전 잠금이 켜져 있다면 해제해 주세요</small>
+  </div>
+
+  <!-- 무전기 암호 입력 (한글 IME 입력을 위해 HTML 오버레이 사용 · 키보드에 가리지 않게 최상단 고정) -->
+  <div id="pw-modal" class="hidden">
+    <div class="pw-card" role="dialog" aria-labelledby="pw-title">
+      <div class="pw-head" id="pw-title">📻 무전기 암호 입력 <small>(한글)</small></div>
+      <p class="pw-q">"AI가 텍스트를 처리하는 기본 단위는?"</p>
+      <form id="pw-form" class="pw-row" autocomplete="off">
+        <input id="pw-input" type="text" maxlength="20" placeholder="암호 입력 (한글)" enterkeyhint="done"
+               autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="무전기 암호 (한글)" />
+        <button type="submit" id="pw-submit">확인</button>
+        <button type="button" id="pw-cancel" class="ghost">닫기</button>
+      </form>
+      <div class="msg" id="pw-msg"></div>
+    </div>
+  </div>
+
+  <script>
+  /* =====================================================================
+   *  0. 공통 설정
+   * ===================================================================== */
+  const PARAMS = new URLSearchParams(location.search);
+  // ?debug=1     → 핫스팟 영역 표시
+  // ?debug=fsm   → + 화로 조리 재료 지급
+  // ?debug=ramen → + 완성된 라면 지급 (선택지 · BAD END 테스트)
+  // ?debug=radio → 부장님 기상 상태로 시작 (무전기 암호 · 배선 퍼즐 바로 테스트)
+  const DEBUG = PARAMS.get("debug");
+
+  /* ★ 백엔드 서버 주소 — 비워 두면 지금 접속한 서버(server.py)를 그대로 사용
+   *   외부 서버에 배포했다면 예: const SERVER_URL = "https://your-service.onrender.com";
+   *   (주소창에 ?api=http://192.168.0.10:8000 을 붙여 임시로 바꿀 수도 있음) */
+  const SERVER_URL = "";
+  const API_BASE = (PARAMS.get("api") || SERVER_URL || (location.protocol.startsWith("http") ? location.origin : "http://localhost:8000")).replace(/\/$/, "");
+
+  const RADIO_PASSWORD = "토큰";
+  const TEST_PASS_PENALTY_SEC = 600;   // ⚡ 테스트 패스 사용 시 기록에 더해지는 시간 (10분)
+
+  const GAME_W = 1280, GAME_H = 720;
+  const VIEW_H = 600;
+  const SLOT_COUNT = 8;
+  const INV = { SW: 132, SH: 94, GAP: 16 };
+  /** 인벤토리 i번째 슬롯의 중심 좌표 (게임/UI 씬 공통 좌표계) */
+  const slotCenter = (i) => ({
+    x: (GAME_W - (SLOT_COUNT * INV.SW + (SLOT_COUNT - 1) * INV.GAP)) / 2 + INV.SW / 2 + i * (INV.SW + INV.GAP),
+    y: VIEW_H + 58,
+  });
+  const FONT = 'system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Noto Sans CJK KR", sans-serif';
+  const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", ' + FONT;
+  const TEXT_RES = Math.min(window.devicePixelRatio || 1, 2);
+
+  /* Kenney 우드/양피지 팔레트 */
+  const C = {
+    outline: 0x2b1d14,
+    woodDark: 0x3e2410, woodShade: 0x6b4423, wood: 0x8b5a2b, woodLight: 0xa8743f,
+    paperShade: 0xc9a874, paper: 0xf5e6c8, paperLight: 0xfdf6e3,
+    ink: "#4a2c17", inkSoft: "#6b5440", cream: "#fdf2d8",
+  };
+
+  /* 아이템 정의 — 아이콘은 BootScene에서 icon_<id> 텍스처로 생성 */
+  const ITEMS = {
+    branch:       { name: "나뭇가지",       color: 0x8b5a2b, max: 10 },
+    fish_metal:   { name: "물고기 쇳덩어리", color: 0x6b7280, max: 1 },
+    magazine:     { name: "월간 피싱",       color: 0x2563eb, max: 1 },
+    lighter:      { name: "라이터",          color: 0xdc2626, max: 1 },
+    pot_empty:    { name: "빈 냄비",         color: 0x64748b, max: 1 },
+    pot_water:    { name: "물 찬 냄비",      color: 0x0891b2, max: 1 },
+    ramen_raw:    { name: "봉지 라면",       color: 0xea580c, max: 1 },
+    ramen_cooked: { name: "완성된 라면",     color: 0xeab308, max: 1 },
+    cutlery:      { name: "수저세트",        color: 0x94a3b8, max: 1 },
+    recipe:       { name: "레시피",          color: 0xa16207, max: 1,
+      onSelect: () => say(
+        narr("📜 [무인도 라면 레시피] — 재훈"),
+        narr("① 나뭇가지 10개를 화로에 쌓는다   ② 잡지를 찢어 불쏘시개로 넣는다"),
+        narr("③ 라이터로 불을 붙인다   ④ 물 찬 냄비를 올린다   ⑤ 물이 끓으면 라면 투입!")
+      ) },
+  };
+
+  /* =====================================================================
+   *  1. 전역 게임 상태
+   * ===================================================================== */
+  const GameState = {
+    playerName: "",
+    startTime: 0,
+    endTime: 0,
+    inventory: [],
+    selected: null,
+    flags: {},
+    busy: false,
+    finished: false,
+    sending: null,
+    lastResult: null,
+    events: null,
+    penaltySec: 0,          // 테스트 패스 등 벌점 시간
+    get elapsedSec() {
+      if (!this.startTime) return 0;
+      return Math.floor(((this.endTime || Date.now()) - this.startTime) / 1000) + this.penaltySec;
+    },
+  };
+
+  /* =====================================================================
+   *  2. 인벤토리 API
+   * ===================================================================== */
+  const Inventory = {
+    get items() { return GameState.inventory; },
+    get selected() { return GameState.selected; },
+    count(id) { const it = this.items.find((i) => i.id === id); return it ? it.count : 0; },
+    has(id, n = 1) { return this.count(id) >= n; },
+    canAdd(id, n = 1) {
+      const it = this.items.find((i) => i.id === id);
+      if (!it) return this.items.length < SLOT_COUNT;
+      return it.count + n <= ITEMS[id].max;
+    },
+    add(id, n = 1, opts = {}) {
+      const def = ITEMS[id];
+      if (!def) throw new Error("Unknown item: " + id);
+      let it = this.items.find((i) => i.id === id);
+      if (!it) {
+        if (this.items.length >= SLOT_COUNT) { toast("인벤토리가 가득 찼습니다"); return 0; }
+        it = { id, count: 0 };
+        this.items.push(it);
+      }
+      const added = Math.min(n, def.max - it.count);
+      if (added > 0) {
+        it.count += added;
+        GameState.events.emit("inventory-changed", { id, delta: added, quiet: !!opts.quiet });
+      }
+      return added;
+    },
+    remove(id, n = 1) {
+      const idx = this.items.findIndex((i) => i.id === id);
+      if (idx < 0) return 0;
+      const it = this.items[idx];
+      const removed = Math.min(n, it.count);
+      it.count -= removed;
+      if (it.count <= 0) {
+        this.items.splice(idx, 1);
+        if (GameState.selected === id) GameState.selected = null;
+      }
+      GameState.events.emit("inventory-changed", { id, delta: -removed });
+      return removed;
+    },
+    replace(fromId, toId) {
+      const it = this.items.find((i) => i.id === fromId);
+      if (!it) return false;
+      it.id = toId; it.count = 1;
+      if (GameState.selected === fromId) GameState.selected = toId;
+      GameState.events.emit("inventory-changed", { id: toId, delta: 1 });
+      return true;
+    },
+    select(id) {
+      GameState.selected = id && this.has(id) ? id : null;
+      GameState.events.emit("selection-changed", GameState.selected);
+    },
+  };
+
+  /* =====================================================================
+   *  3. 대사 / UI 이벤트 헬퍼
+   * ===================================================================== */
+  function say(...lines) {
+    GameState.events.emit("say", lines.map((l) =>
+      typeof l === "string" ? { speaker: GameState.playerName, text: l } : l));
+  }
+  const line = (speaker, text) => ({ speaker, text });
+  const narr = (text) => ({ speaker: "", text });
+  const toast = (msg) => GameState.events && GameState.events.emit("toast", msg);
+  const setBackButton = (handler) => GameState.events.emit("set-back", handler || null);
+  const showChoice = (opts) => GameState.events.emit("choice", opts);
+  const showEnding = (opts) => GameState.events.emit("ending", opts);
+  const setQuest = (text) => GameState.events.emit("quest", text || null);
+
+  function josa(word, pair) {
+    const [withB, withoutB] = pair.split("/");
+    const code = word.charCodeAt(word.length - 1);
+    if (code < 0xac00 || code > 0xd7a3) return word + withoutB;
+    return word + ((code - 0xac00) % 28 ? withB : withoutB);
+  }
+
+  function textStyle(extra = {}) {
+    return { fontFamily: FONT, fontSize: "20px", color: "#ffffff", resolution: TEXT_RES, ...extra };
+  }
+  const fmtTime = (sec) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
+
+  /* =====================================================================
+   *  4. 서버 전송
+   * ===================================================================== */
+  const ApiClient = {
+    async sendResult(resultType, solvedQuiz = false) {
+      if (GameState.lastResult) return GameState.lastResult;
+      if (GameState.sending) return GameState.sending;
+      if (!GameState.endTime) GameState.endTime = Date.now();
+      GameState.finished = true;
+
+      const payload = {
+        player_name: GameState.playerName,
+        result_type: resultType,
+        play_time_sec: Math.floor(GameState.elapsedSec),
+        solved_quiz: !!solvedQuiz,
+      };
+      GameState.sending = (async () => {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await fetch(`${API_BASE}/api/game/record`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            GameState.lastResult = await res.json();
+            console.log("서버 기록 완료:", GameState.lastResult);
+            return GameState.lastResult;
+          } catch (e) {
+            console.error(`서버 기록 실패 (${attempt}/3):`, e);
+            await new Promise((r) => setTimeout(r, 800 * attempt));
+          }
+        }
+        return null;
+      })();
+      const result = await GameState.sending;
+      GameState.sending = null;
+      return result;
+    },
+  };
+
+  /* =====================================================================
+   *  5. Kenney 스타일 UI 그리기 헬퍼 (우드 패널 · 양피지 · 3D 버튼)
+   * ===================================================================== */
+  function drawWood(g, x, y, w, h, r = 12) {
+    g.fillStyle(C.woodDark, 1).fillRoundedRect(x - 3, y - 3, w + 6, h + 6, r + 3);
+    g.fillStyle(C.woodShade, 1).fillRoundedRect(x, y, w, h, r);
+    g.fillStyle(C.wood, 1).fillRoundedRect(x, y, w, h - 5, r);
+    g.fillStyle(C.woodLight, 1).fillRoundedRect(x + 6, y + 4, w - 12, Math.max(4, h * 0.26), Math.min(r, 6));
+    g.lineStyle(2, C.woodShade, 0.55).lineBetween(x + 14, y + h * 0.62, x + w - 14, y + h * 0.62);
+  }
+
+  function drawParchment(g, x, y, w, h, r = 20) {
+    g.fillStyle(C.woodDark, 1).fillRoundedRect(x - 4, y - 4, w + 8, h + 8, r + 4);
+    g.fillStyle(C.wood, 1).fillRoundedRect(x, y, w, h, r);
+    g.fillStyle(C.woodLight, 1).fillRoundedRect(x + 8, y + 3, w - 16, 7, 4);
+    g.fillStyle(C.paperShade, 1).fillRoundedRect(x + 10, y + 10, w - 20, h - 20, Math.max(4, r - 8));
+    g.fillStyle(C.paper, 1).fillRoundedRect(x + 12, y + 16, w - 24, h - 28, Math.max(4, r - 10));   // 위쪽이 비치는 안쪽 그림자
+    g.fillStyle(C.woodDark, 1);
+    [[x + 14, y + 14], [x + w - 14, y + 14], [x + 14, y + h - 14], [x + w - 14, y + h - 14]].forEach(([nx, ny]) => g.fillCircle(nx, ny, 3));
+  }
+
+  const BTN = {
+    yellow: { face: 0xffc53d, light: 0xffe08a, shade: 0xc98a12, text: "#4a2c17", stroke: null },
+    green:  { face: 0x7cc24a, light: 0xa6e07a, shade: 0x4d8a2a, text: "#ffffff", stroke: "#2d5a17" },
+    red:    { face: 0xe0533d, light: 0xf28b7a, shade: 0x9c2f22, text: "#ffffff", stroke: "#6b1d14" },
+    wood:   { face: 0x8b5a2b, light: 0xb07a44, shade: 0x5a381c, text: "#fdf2d8", stroke: "#3e2410" },
+    stone:  { face: 0x78716c, light: 0xa8a29e, shade: 0x44403c, text: "#f5f5f4", stroke: "#292524" },
+  };
+
+  /** 3D 버튼: 누르면 앞면이 아래로 쑥 들어가고, 손을 떼면 실행 */
+  function make3DButton(scene, x, y, w, h, label, kind, onClick, fontSize = 22) {
+    const P = BTN[kind] || BTN.yellow, D = 6;
+    const c = scene.add.container(x, y);
+    const base = scene.add.graphics();
+    base.fillStyle(C.outline, 1).fillRoundedRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + D + 6, 15);
+    base.fillStyle(P.shade, 1).fillRoundedRect(-w / 2, -h / 2 + D, w, h, 12);
+    const face = scene.add.container(0, 0);
+    const fg = scene.add.graphics();
+    fg.fillStyle(P.face, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 12);
+    fg.fillStyle(P.light, 1).fillRoundedRect(-w / 2 + 6, -h / 2 + 4, w - 12, h * 0.34, 8);
+    const txt = scene.add.text(0, 1, label, textStyle({
+      fontSize: fontSize + "px", fontStyle: "bold", color: P.text,
+      ...(P.stroke ? { stroke: P.stroke, strokeThickness: 4 } : {}),
+    })).setOrigin(0.5);
+    face.add([fg, txt]);
+    const zone = scene.add.zone(0, D / 2, w + 6, h + D + 6).setInteractive({ useHandCursor: true });
+    c.add([base, face, zone]);
+    let pressed = false;
+    const press = (p) => { pressed = p; face.y = p ? D - 2 : 0; };
+    zone.on("pointerdown", () => { if (!c.disabled) press(true); });
+    zone.on("pointerout", () => press(false));
+    zone.on("pointerup", () => {
+      if (!pressed) return;
+      press(false);
+      if (!c.disabled && onClick) onClick();
+    });
+    c.label = txt;
+    return c;
+  }
+
+  /* =====================================================================
+   *  6. 벡터 아이콘 (128×128 텍스처) — 두꺼운 외곽선 + 2단 음영
+   * ===================================================================== */
+  const OW = 6;
+  const K = {
+    rr(g, x, y, w, h, r, fill, ow = OW) { g.fillStyle(fill, 1).fillRoundedRect(x, y, w, h, r); if (ow) g.lineStyle(ow, C.outline, 1).strokeRoundedRect(x, y, w, h, r); },
+    el(g, x, y, w, h, fill, ow = OW) { g.fillStyle(fill, 1).fillEllipse(x, y, w, h); if (ow) g.lineStyle(ow, C.outline, 1).strokeEllipse(x, y, w, h); },
+    ci(g, x, y, r, fill, ow = OW) { g.fillStyle(fill, 1).fillCircle(x, y, r); if (ow) g.lineStyle(ow, C.outline, 1).strokeCircle(x, y, r); },
+    po(g, pts, fill, ow = OW) { g.fillStyle(fill, 1).fillPoints(pts, true); if (ow) g.lineStyle(ow, C.outline, 1).strokePoints(pts, true, true); },
+    /** 둥근 끝 막대 (외곽선 먼저 → 색) */
+    stickOutline(g, x1, y1, x2, y2, w) {
+      g.lineStyle(w + OW * 2, C.outline, 1).lineBetween(x1, y1, x2, y2);
+      g.fillStyle(C.outline, 1).fillCircle(x1, y1, w / 2 + OW).fillCircle(x2, y2, w / 2 + OW);
+    },
+    stickFill(g, x1, y1, x2, y2, w, col) {
+      g.lineStyle(w, col, 1).lineBetween(x1, y1, x2, y2);
+      g.fillStyle(col, 1).fillCircle(x1, y1, w / 2).fillCircle(x2, y2, w / 2);
+    },
+    wave(g, x1, x2, y, amp, col, w) {
+      const pts = [];
+      for (let x = x1; x <= x2; x += 4) pts.push({ x, y: y + Math.sin((x - x1) / 5) * amp });
+      g.lineStyle(w, col, 1).strokePoints(pts);
+    },
+  };
+
+  /** 냄비 (빈 냄비 / 물 찬 냄비 공용) */
+  function paintPot(g, water) {
+    K.rr(g, 4, 58, 26, 16, 8, 0x475569);                        // 손잡이
+    K.rr(g, 98, 58, 26, 16, 8, 0x475569);
+    g.fillStyle(C.outline, 1).fillRoundedRect(17, 45, 94, 70, { tl: 6, tr: 6, bl: 28, br: 28 });
+    g.fillStyle(0x94a3b8, 1).fillRoundedRect(23, 48, 82, 61, { tl: 4, tr: 4, bl: 23, br: 23 });
+    g.fillStyle(0x64748b, 1).fillRoundedRect(23, 84, 82, 25, { tl: 0, tr: 0, bl: 23, br: 23 });     // 아래 음영
+    g.fillStyle(0xe2e8f0, 1).fillRoundedRect(31, 58, 9, 30, 4);                                     // 하이라이트
+    g.fillStyle(0xcbd5e1, 1).fillRoundedRect(44, 58, 5, 24, 2);
+    K.el(g, 64, 46, 108, 32, 0xe2e8f0);                         // 은색 테두리
+    g.fillStyle(0xf8fafc, 1).fillEllipse(48, 39, 34, 6);
+    if (!water) {
+      K.el(g, 64, 47, 88, 20, 0x334155, 4);                     // 텅 빈 안쪽
+      g.fillStyle(0x1e293b, 1).fillEllipse(64, 51, 72, 9);
+    } else {
+      K.el(g, 64, 47, 88, 20, 0x0284c7, 4);                     // 가득 찬 물
+      g.fillStyle(0x38bdf8, 1).fillEllipse(64, 45, 78, 13);
+      g.fillStyle(0x7dd3fc, 1).fillEllipse(56, 43, 40, 6);
+      g.lineStyle(3, 0xffffff, 1);
+      g.beginPath().arc(46, 49, 8, Math.PI * 1.15, Math.PI * 1.85).strokePath();
+      g.beginPath().arc(78, 47, 7, Math.PI * 1.15, Math.PI * 1.85).strokePath();
+      K.ci(g, 30, 26, 6, 0x38bdf8, 4);                          // 찰랑 튀는 물방울
+      K.ci(g, 98, 22, 5, 0x38bdf8, 4);
+      K.ci(g, 82, 14, 3, 0x7dd3fc, 3);
+    }
+  }
+
+  const ICON_PAINTERS = {
+    icon_branch(g) {
+      K.stickOutline(g, 18, 106, 108, 26, 16);
+      K.stickOutline(g, 66, 66, 98, 98, 8);
+      K.stickFill(g, 18, 106, 108, 26, 16, 0x9a6b3f);
+      K.stickFill(g, 66, 66, 98, 98, 8, 0x9a6b3f);
+      g.lineStyle(5, 0xc4935f, 1).lineBetween(22, 98, 100, 28);
+      g.lineStyle(3, 0x6b4423, 1).lineBetween(40, 92, 56, 78).lineBetween(70, 58, 84, 46);
+      K.ci(g, 108, 26, 7, 0xe0b98a, 4);
+      K.el(g, 104, 104, 26, 16, 0x6abe30, 4);
+      g.fillStyle(0xa6e07a, 1).fillEllipse(100, 101, 10, 5);
+    },
+    icon_fish_metal(g) {
+      K.po(g, [{ x: 84, y: 64 }, { x: 120, y: 34 }, { x: 112, y: 64 }, { x: 120, y: 94 }], 0x94a3b8);
+      K.po(g, [{ x: 44, y: 44 }, { x: 62, y: 22 }, { x: 74, y: 44 }], 0x94a3b8);
+      g.fillStyle(C.outline, 1).fillEllipse(56, 64, 98, 62);
+      g.fillStyle(0xb8c0cc, 1).fillEllipse(56, 64, 86, 50);
+      g.fillStyle(0x8a94a3, 1).fillEllipse(58, 77, 70, 20);
+      g.fillStyle(0xeef2f7, 1).fillEllipse(48, 51, 44, 12);
+      K.ci(g, 30, 58, 7, 0x1f2937, 3);
+      g.fillStyle(0xffffff, 1).fillCircle(28, 56, 2.5);
+      g.lineStyle(4, C.outline, 1).beginPath().arc(26, 64, 24, -0.75, 0.75).strokePath();
+      g.fillStyle(0x64748b, 1).fillCircle(64, 62, 3).fillCircle(76, 62, 3).fillCircle(70, 72, 3);
+    },
+    icon_magazine(g) {
+      K.rr(g, 38, 24, 70, 90, 6, 0xf8fafc);
+      g.lineStyle(2, 0xcbd5e1, 1).lineBetween(104, 32, 104, 108).lineBetween(100, 32, 100, 108);
+      K.rr(g, 22, 14, 74, 92, 6, 0x2563eb);
+      g.fillStyle(0x1d4ed8, 1).fillRect(25, 17, 11, 86);
+      g.fillStyle(0x60a5fa, 1).fillRect(86, 18, 5, 84);
+      K.rr(g, 40, 22, 48, 18, 3, 0xfef3c7, 3);
+      g.fillStyle(0x9a3412, 1).fillRect(45, 28, 26, 6);
+      g.fillStyle(0x93c5fd, 1).fillEllipse(60, 72, 36, 18).fillTriangle(76, 72, 88, 62, 88, 82);
+      g.fillStyle(0x1e3a8a, 1).fillCircle(50, 70, 2.5);
+      g.fillStyle(0xfef3c7, 1).fillRect(40, 92, 36, 4);
+    },
+    icon_lighter(g) {
+      K.rr(g, 38, 50, 54, 68, 12, 0xfacc15);
+      g.fillStyle(0xd4a015, 1).fillRoundedRect(74, 54, 14, 60, 6);
+      g.fillStyle(0xfef08a, 1).fillRoundedRect(45, 57, 10, 54, 5);
+      g.lineStyle(OW, C.outline, 1).strokeRoundedRect(38, 50, 54, 68, 12);
+      K.rr(g, 42, 18, 48, 36, 6, 0xd1d5db);                      // 금속 바람막이
+      g.fillStyle(0x9ca3af, 1).fillRect(74, 22, 12, 28);
+      g.fillStyle(0xf3f4f6, 1).fillRect(47, 22, 6, 28);
+      g.fillStyle(0x4b5563, 1);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) g.fillCircle(58 + c * 9, 28 + r * 9, 2.4);
+      K.ci(g, 38, 44, 13, 0x6b7280, 5);                          // 점화 휠
+      g.lineStyle(2, 0x374151, 1).lineBetween(33, 34, 33, 54).lineBetween(38, 32, 38, 56).lineBetween(43, 34, 43, 54);
+      K.rr(g, 80, 46, 16, 10, 3, 0x4b5563, 4);                   // 가스 버튼
+    },
+    icon_pot_empty(g) { paintPot(g, false); },
+    icon_pot_water(g) { paintPot(g, true); },
+    icon_ramen_raw(g) {
+      const pts = [];
+      for (let i = 0; i <= 8; i++) pts.push({ x: 22 + i * 10.5, y: i % 2 ? 12 : 21 });
+      pts.push({ x: 106, y: 106 });
+      for (let i = 8; i >= 0; i--) pts.push({ x: 22 + i * 10.5, y: i % 2 ? 116 : 107 });
+      g.fillStyle(0xdc2626, 1).fillPoints(pts, true);
+      g.fillStyle(0xb91c1c, 1).fillRect(92, 22, 12, 84);              // 오른쪽 음영
+      g.fillStyle(0xf87171, 1).fillRect(28, 50, 7, 50);               // 왼쪽 하이라이트
+      g.fillStyle(0xf97316, 1).fillRect(24, 26, 80, 15);              // 주황 줄무늬
+      g.fillStyle(0xfacc15, 1).fillRect(24, 41, 80, 6);
+      g.fillStyle(0xf97316, 1).fillRect(24, 94, 80, 6);
+      g.lineStyle(OW, C.outline, 1).strokePoints(pts, true, true);
+      K.ci(g, 64, 70, 21, 0xfef3c7, 4);                                // 라면 로고
+      K.wave(g, 48, 80, 64, 2.5, 0xeab308, 4);
+      K.wave(g, 48, 80, 71, 2.5, 0xeab308, 4);
+      K.wave(g, 50, 78, 78, 2.5, 0xeab308, 4);
+      g.fillStyle(0xdc2626, 1).fillCircle(74, 58, 4);
+    },
+    icon_ramen_cooked(g) {
+      g.lineStyle(5, 0xe5e7eb, 1);
+      [[42, 8], [64, 4], [86, 8]].forEach(([x, y]) => {
+        const pts = [];
+        for (let i = 0; i <= 6; i++) pts.push({ x: x + Math.sin(i * 1.1) * 4, y: y + i * 4 });
+        g.strokePoints(pts);
+      });
+      const bowl = [{ x: 12, y: 58 }];
+      for (let a = 0; a <= 16; a++) {
+        const t = (a / 16) * Math.PI;
+        bowl.push({ x: 64 - Math.cos(t) * 52, y: 58 + Math.sin(t) * 44 });
+      }
+      K.rr(g, 44, 96, 40, 16, 5, 0xb91c1c, 5);
+      g.fillStyle(0xdc2626, 1).fillPoints(bowl, true);
+      g.fillStyle(0xb91c1c, 1).fillEllipse(70, 92, 70, 14);
+      g.fillStyle(0xfef2f2, 1).fillRect(20, 70, 88, 6);
+      g.lineStyle(OW, C.outline, 1).strokePoints(bowl, true, true);
+      K.el(g, 64, 58, 104, 28, 0xfde68a);
+      K.wave(g, 30, 64, 56, 2.5, 0xeab308, 4);
+      K.wave(g, 44, 90, 62, 2.5, 0xeab308, 4);
+      K.ci(g, 84, 54, 10, 0xffffff, 3);
+      g.fillStyle(0xf59e0b, 1).fillCircle(84, 54, 4.5);
+      K.ci(g, 46, 52, 7, 0x22c55e, 3);
+      K.stickOutline(g, 76, 44, 116, 6, 5); K.stickOutline(g, 84, 46, 122, 14, 5);
+      K.stickFill(g, 76, 44, 116, 6, 5, 0xd4a373); K.stickFill(g, 84, 46, 122, 14, 5, 0xe0b98a);
+    },
+    icon_cutlery(g) {
+      K.stickOutline(g, 28, 112, 96, 14, 7); K.stickOutline(g, 42, 116, 108, 20, 7);
+      K.stickFill(g, 28, 112, 96, 14, 7, 0xb07a44); K.stickFill(g, 42, 116, 108, 20, 7, 0xc8945a);
+      K.stickOutline(g, 100, 112, 66, 58, 10);
+      K.stickFill(g, 100, 112, 66, 58, 10, 0xcbd5e1);
+      g.save(); g.translateCanvas(54, 40); g.rotateCanvas(-0.6);
+      K.el(g, 0, 0, 34, 48, 0xe2e8f0);
+      g.fillStyle(0x94a3b8, 1).fillEllipse(3, 4, 20, 30);
+      g.fillStyle(0xffffff, 1).fillEllipse(-7, -8, 7, 14);
+      g.restore();
+      g.lineStyle(3, 0xf8fafc, 1).lineBetween(94, 104, 72, 68);
+    },
+    icon_recipe(g) {
+      K.rr(g, 28, 22, 72, 86, 4, 0xfef3c7);
+      g.fillStyle(0xf3dfa2, 1).fillRect(86, 26, 11, 78);
+      g.fillStyle(0x8b5a2b, 1);
+      for (let i = 0; i < 5; i++) g.fillRect(38, 38 + i * 12, i % 2 ? 34 : 46, 4);
+      K.rr(g, 18, 12, 92, 18, 9, 0xd6b98c);
+      g.fillStyle(0xf1dcb5, 1).fillRect(28, 16, 70, 4);
+      K.rr(g, 18, 100, 92, 18, 9, 0xd6b98c);
+      g.fillStyle(0xf1dcb5, 1).fillRect(28, 104, 70, 4);
+      K.ci(g, 82, 88, 9, 0xdc2626, 4);
+    },
+
+    /* ── 더미 오브젝트 ── */
+    obj_bottle(g) {
+      K.rr(g, 54, 4, 20, 14, 4, 0xb07a44, 5);
+      K.rr(g, 54, 16, 20, 24, 4, 0x6fcf97, 5);
+      K.rr(g, 38, 34, 52, 86, 18, 0x6fcf97);
+      g.fillStyle(0x3fa86a, 1).fillRoundedRect(72, 40, 14, 74, 8);
+      g.fillStyle(0xd6f8e3, 1).fillRoundedRect(45, 44, 9, 62, 4);
+      g.lineStyle(OW, C.outline, 1).strokeRoundedRect(38, 34, 52, 86, 18);
+      K.rr(g, 38, 66, 52, 24, 0, 0xfef3c7, 4);
+      g.fillStyle(0xb45309, 1).fillRect(48, 74, 30, 5);
+    },
+    obj_shirt(g) {
+      const pts = [{ x: 36, y: 18 }, { x: 52, y: 12 }, { x: 64, y: 22 }, { x: 76, y: 12 }, { x: 92, y: 18 }, { x: 120, y: 46 },
+        { x: 102, y: 62 }, { x: 92, y: 52 }, { x: 92, y: 114 }, { x: 36, y: 114 }, { x: 36, y: 52 }, { x: 26, y: 62 }, { x: 8, y: 46 }];
+      g.fillStyle(0x60a5fa, 1).fillPoints(pts, true);
+      g.fillStyle(0x3b82f6, 1).fillRect(76, 54, 15, 59);
+      g.fillStyle(0xfbbf24, 1).fillRect(37, 72, 54, 12);
+      g.fillStyle(0x93c5fd, 1).fillRect(42, 30, 8, 40);
+      g.lineStyle(OW, C.outline, 1).strokePoints(pts, true, true);
+      g.lineStyle(5, C.outline, 1).beginPath().arc(64, 14, 13, 0.3, Math.PI - 0.3).strokePath();
+    },
+    obj_sock(g) {
+      const pts = [{ x: 38, y: 8 }, { x: 78, y: 8 }, { x: 78, y: 70 }, { x: 108, y: 86 }, { x: 112, y: 106 },
+        { x: 96, y: 120 }, { x: 54, y: 112 }, { x: 38, y: 92 }];
+      g.fillStyle(0xf8fafc, 1).fillPoints(pts, true);
+      g.fillStyle(0xef4444, 1).fillRect(38, 8, 40, 20);
+      g.fillStyle(0xfca5a5, 1).fillRect(38, 32, 40, 6);
+      g.fillStyle(0x94a3b8, 1).fillEllipse(98, 104, 26, 22).fillEllipse(48, 100, 18, 20);
+      g.fillStyle(0xcbd5e1, 1).fillRect(66, 30, 11, 50);
+      g.lineStyle(OW, C.outline, 1).strokePoints(pts, true, true);
+    },
+    obj_rod(g) {
+      K.stickOutline(g, 16, 120, 118, 6, 5);
+      K.stickFill(g, 16, 120, 118, 6, 5, 0x8b5a2b);
+      K.stickOutline(g, 14, 122, 38, 94, 12);
+      K.stickFill(g, 14, 122, 38, 94, 12, 0x3f3f46);
+      K.ci(g, 46, 92, 12, 0x9ca3af, 5);
+      g.fillStyle(0x4b5563, 1).fillCircle(46, 92, 4);
+      const pts = [];
+      for (let i = 0; i <= 12; i++) pts.push({ x: 118 - i * 2, y: 6 + i * 6 + Math.sin(i / 2) * 4 });
+      g.lineStyle(2, 0x475569, 1).strokePoints(pts);
+      g.lineStyle(3, 0x6b7280, 1).beginPath().arc(96, 82, 6, 0, Math.PI).strokePath();
+    },
+    obj_plastic(g) {
+      g.lineStyle(10, C.outline, 1).beginPath().arc(46, 40, 14, Math.PI, 0).strokePath();
+      g.beginPath().arc(82, 40, 14, Math.PI, 0).strokePath();
+      g.lineStyle(5, 0xe2e8f0, 1).beginPath().arc(46, 40, 14, Math.PI, 0).strokePath();
+      g.beginPath().arc(82, 40, 14, Math.PI, 0).strokePath();
+      const pts = [{ x: 24, y: 40 }, { x: 104, y: 40 }, { x: 112, y: 112 }, { x: 16, y: 112 }];
+      g.fillStyle(0xf1f5f9, 1).fillPoints(pts, true);
+      g.fillStyle(0xcbd5e1, 1).fillPoints([{ x: 86, y: 40 }, { x: 104, y: 40 }, { x: 112, y: 112 }, { x: 92, y: 112 }], true);
+      g.lineStyle(3, 0x94a3b8, 1).lineBetween(40, 56, 50, 100).lineBetween(70, 60, 62, 104);
+      g.fillStyle(0xef4444, 1).fillRect(36, 76, 40, 5);
+      g.fillStyle(0x3b82f6, 1).fillRect(40, 86, 30, 4);
+      g.lineStyle(OW, C.outline, 1).strokePoints(pts, true, true);
+    },
+    obj_shell(g) {
+      const pts = [{ x: 64, y: 112 }];
+      for (let i = 0; i <= 14; i++) {
+        const a = Math.PI + (i / 14) * Math.PI;
+        const r = i % 2 ? 50 : 54;
+        pts.push({ x: 64 + Math.cos(a) * r, y: 96 + Math.sin(a) * r });
+      }
+      K.rr(g, 48, 98, 32, 18, 5, 0xf9a8d4, 5);
+      g.fillStyle(0xfbcfe8, 1).fillPoints(pts, true);
+      g.fillStyle(0xf9a8d4, 1).fillPoints([{ x: 64, y: 112 }, { x: 100, y: 62 }, { x: 116, y: 92 }], true);
+      g.lineStyle(3, 0xec4899, 1);
+      for (let i = 1; i < 7; i++) {
+        const a = Math.PI + (i / 7) * Math.PI;
+        g.lineBetween(64, 108, 64 + Math.cos(a) * 46, 96 + Math.sin(a) * 46);
+      }
+      g.fillStyle(0xfdf2f8, 1).fillEllipse(44, 64, 14, 8);
+      g.lineStyle(OW, C.outline, 1).strokePoints(pts, true, true);
+    },
+    obj_crab(g) {
+      [[34, 82, 10, 104], [40, 88, 18, 114], [94, 82, 118, 104], [88, 88, 110, 114]].forEach(([a, b, c2, d]) => K.stickOutline(g, a, b, c2, d, 5));
+      [[34, 82, 10, 104], [40, 88, 18, 114], [94, 82, 118, 104], [88, 88, 110, 114]].forEach(([a, b, c2, d]) => K.stickFill(g, a, b, c2, d, 5, 0xdc2626));
+      K.stickOutline(g, 38, 66, 22, 46, 7); K.stickOutline(g, 90, 66, 106, 46, 7);
+      K.stickFill(g, 38, 66, 22, 46, 7, 0xef4444); K.stickFill(g, 90, 66, 106, 46, 7, 0xef4444);
+      K.ci(g, 20, 36, 15, 0xef4444); K.ci(g, 108, 36, 15, 0xef4444);
+      g.fillStyle(C.outline, 1).fillTriangle(12, 22, 22, 34, 28, 20).fillTriangle(116, 22, 106, 34, 100, 20);
+      K.el(g, 64, 80, 78, 50, 0xef4444);
+      g.fillStyle(0xb91c1c, 1).fillEllipse(66, 92, 62, 18);
+      g.fillStyle(0xfca5a5, 1).fillEllipse(54, 68, 30, 10);
+      g.lineStyle(OW, C.outline, 1).strokeEllipse(64, 80, 78, 50);
+      K.stickOutline(g, 52, 58, 50, 40, 3); K.stickOutline(g, 76, 58, 78, 40, 3);
+      K.stickFill(g, 52, 58, 50, 40, 3, 0xef4444); K.stickFill(g, 76, 58, 78, 40, 3, 0xef4444);
+      K.ci(g, 50, 36, 8, 0xffffff, 4); K.ci(g, 78, 36, 8, 0xffffff, 4);
+      g.fillStyle(C.outline, 1).fillCircle(52, 37, 3.5).fillCircle(80, 37, 3.5);
+      g.lineStyle(4, C.outline, 1).beginPath().arc(64, 82, 9, 0.3, Math.PI - 0.3).strokePath();
+    },
+  };
+
+  /** 바닥 아이템 그래픽 (은은한 빛 + 아이콘) */
+  function makeItemSprite(scene, id, size = 68, plain = false) {
+    if (id === "branch") return makeBranchSprite(scene);
+    const c = scene.add.container(0, 0);
+    if (plain) {                                   // 배낭 속처럼 다른 물건과 섞여 있을 때: 후광·반짝임 없이 그림자만
+      c.add([scene.add.ellipse(4, size * 0.36, size * 0.8, size * 0.2, 0x000000, 0.3), scene.add.image(0, 0, "icon_" + id).setDisplaySize(size, size)]);
+      return c;
+    }
+    const glow = scene.add.circle(0, 2, size * 0.5, 0xfff3b0, 0.22);
+    scene.tweens.add({ targets: glow, scale: 1.18, alpha: 0.1, duration: 900, yoyo: true, repeat: -1 });
+    const img = scene.add.image(0, 0, "icon_" + id).setDisplaySize(size, size);
+    const spark = scene.add.text(size * 0.42, -size * 0.42, "✦", textStyle({ fontSize: "18px", color: "#fff7c2" })).setOrigin(0.5);
+    scene.tweens.add({ targets: spark, alpha: 0.1, scale: 0.6, duration: 800, yoyo: true, repeat: -1, delay: Phaser.Math.Between(0, 600) });
+    c.add([glow, img, spark]);
+    return c;
+  }
+
+  /** 씬에 놓인 나뭇가지 (그림자 포함) */
+  function makeBranchSprite(scene, shadow = true, forkUp = false) {
+    const c = scene.add.container(0, 0);
+    if (shadow) c.add(scene.add.ellipse(0, 12, 100, 14, 0x000000, 0.15));
+    // forkUp: 곁가지·잎이 위로 삐죽 솟게 (모래·바위 틈에 박힌 느낌)
+    c.add(scene.add.image(0, 0, "icon_branch").setDisplaySize(84, 84).setAngle(forkUp ? 218 : 38));
+    const spark = scene.add.text(4, -24, "✦", textStyle({ fontSize: "17px", color: "#fff7c2" })).setOrigin(0.5);
+    scene.tweens.add({ targets: spark, alpha: 0.1, scale: 0.6, duration: 800, yoyo: true, repeat: -1, delay: Phaser.Math.Between(0, 600) });
+    c.add(spark);
+    return c;
+  }
+
+  /** 떡갈나무 줄기 마디에서 뻗어 나온 잔가지 (원점 = 줄기에 붙은 지점) */
+  function makeTwigSprite(scene, { tip, fork, leaves }) {
+    const c = scene.add.container(0, 0);
+    const g = scene.add.graphics();
+    K.stickOutline(g, 0, 0, tip[0], tip[1], 9);
+    K.stickOutline(g, fork[0][0], fork[0][1], fork[1][0], fork[1][1], 5);
+    K.stickFill(g, 0, 0, tip[0], tip[1], 9, 0x8d6748);
+    K.stickFill(g, fork[0][0], fork[0][1], fork[1][0], fork[1][1], 5, 0x8d6748);
+    g.lineStyle(3, 0xb08a64, 1).lineBetween(tip[0] * 0.15, tip[1] * 0.15 - 2, tip[0] * 0.85, tip[1] * 0.85 - 2);
+    leaves.forEach(([x, y, a]) => {
+      g.save(); g.translateCanvas(x, y); g.rotateCanvas(a);
+      g.fillStyle(C.outline, 1).fillEllipse(0, 0, 28, 15);
+      g.fillStyle(0x5aa832, 1).fillEllipse(0, 0, 23, 11);
+      g.fillStyle(0x9bd65f, 1).fillEllipse(-3, -2, 10, 4);
+      g.restore();
+    });
+    const spark = scene.add.text(tip[0], tip[1] - 16, "✦", textStyle({ fontSize: "17px", color: "#fff7c2" })).setOrigin(0.5);
+    scene.tweens.add({ targets: spark, alpha: 0.1, scale: 0.6, duration: 800, yoyo: true, repeat: -1, delay: Phaser.Math.Between(0, 600) });
+    c.add([g, spark]);
+    return c;
+  }
+
+  /** 해변 모래잡초 한 무더기 */
+  function drawBeachGrass(g, x, y, s, front) {
+    const dark = front ? 0x6f9a35 : 0x55782a, light = front ? 0xa3c95c : 0x7ea43e;
+    [[-14, -24, -10], [-7, -34, -3], [0, -28, 5], [6, -40, 13], [13, -22, 22]].forEach(([bx, h, tip], i) => {
+      g.fillStyle(C.outline, 0.9).fillTriangle(x + (bx - 5) * s, y + 1, x + tip * s, y + (h - 3) * s, x + (bx + 5) * s, y + 1);
+      g.fillStyle(i % 2 ? light : dark, 1).fillTriangle(x + (bx - 3.5) * s, y, x + tip * s, y + h * s, x + (bx + 3.5) * s, y);
+    });
+  }
+
+  /** 물기 먹은 바위 (외곽선 · 젖은 광택 · 이끼) */
+  function drawWetRock(g, x, y, w, h, moss = true) {
+    g.fillStyle(C.outline, 1).fillEllipse(x, y, w + 7, h + 7);
+    g.fillStyle(0x433831, 1).fillEllipse(x, y + 2, w, h);
+    g.fillStyle(0x64574c, 1).fillEllipse(x - w * 0.06, y - h * 0.08, w * 0.84, h * 0.72);
+    g.fillStyle(0xcff3fa, 0.6).fillEllipse(x - w * 0.2, y - h * 0.24, w * 0.36, h * 0.13);
+    if (moss) {
+      g.fillStyle(0x4f7f30, 1).fillEllipse(x + w * 0.12, y - h * 0.36, w * 0.56, h * 0.26);
+      g.fillStyle(0x86b84a, 1).fillEllipse(x + w * 0.06, y - h * 0.42, w * 0.3, h * 0.11);
+    }
+  }
+
+  /**
+   * 나뭇가지를 지형에 자연스럽게 파묻기
+   * - 뒤 레이어(depth 9): 접지 그림자 · 둔덕/바위 · 뒤쪽 풀
+   * - 앞 레이어(depth 12): 가지 끝을 덮는 풀/모래/자갈 → 나뭇가지(depth 10)가 그 사이에 끼어 보임
+   * 가지를 주운 뒤에도 지형 장식은 그대로 남는다.
+   */
+  function nestBranch(scene, x, y, angle, style) {
+    const rad = Phaser.Math.DegToRad(angle);
+    const ex = Math.cos(rad) * 38, ey = Math.sin(rad) * 38;
+    const L = { x: x - ex, y: y - ey + 4 }, R = { x: x + ex, y: y + ey + 4 };
+    const back = scene.add.graphics().setDepth(9);
+    const front = scene.add.graphics().setDepth(12);
+    if (style === "sand") {
+      back.fillStyle(0x000000, 0.13).fillEllipse(x + 2, y + 9, 100, 14);
+      back.fillStyle(0xe3c48a, 1).fillEllipse(L.x + 4, L.y + 4, 78, 24);           // 모래 둔덕
+      back.fillStyle(0xf1d9a5, 1).fillEllipse(L.x + 1, L.y, 62, 15);
+      drawBeachGrass(back, L.x - 10, L.y + 6, 0.95, false);
+      drawBeachGrass(front, L.x + 6, L.y + 12, 1.05, true);                          // 왼쪽 끝은 풀숲에 가려짐
+      front.fillStyle(0xd9b878, 1).fillEllipse(R.x + 4, R.y + 4, 46, 20);            // 오른쪽 끝은 모래에 묻힘
+      front.fillStyle(0xf0d6a0, 1).fillEllipse(R.x + 2, R.y + 1, 40, 14);
+      front.fillStyle(0xfaecd0, 1).fillEllipse(R.x - 3, R.y - 2, 18, 5);
+      front.fillStyle(0xc9a76a, 1).fillCircle(R.x + 16, R.y + 6, 2).fillCircle(R.x - 10, R.y + 7, 1.5);
+    } else if (style === "wet") {
+      back.fillStyle(0x000000, 0.25).fillEllipse(x + 4, y + 11, 118, 18);
+      back.fillStyle(0x5b4e43, 1).fillEllipse(x, y + 10, 128, 22);                  // 젖어서 어두워진 바닥
+      drawWetRock(back, R.x + 16, R.y - 12, 54, 40);                                  // 가지가 기댄 뒤쪽 바위
+      drawWetRock(back, L.x - 20, L.y - 6, 38, 28);
+      drawWetRock(front, L.x + 8, L.y + 12, 34, 22);                                  // 가지 끝을 누르는 앞쪽 돌
+      [[R.x - 4, R.y + 12, 8], [R.x + 10, R.y + 14, 6], [x - 6, y + 15, 5], [L.x + 30, L.y + 14, 5]].forEach(([px, py, r]) => {
+        front.fillStyle(C.outline, 1).fillCircle(px, py, r + 2);
+        front.fillStyle(0x8a8079, 1).fillCircle(px, py, r);
+        front.fillStyle(0xd7f4fa, 0.7).fillCircle(px - r * 0.35, py - r * 0.35, r * 0.3);
+      });
+      front.fillStyle(0x6fa83f, 1).fillEllipse(L.x + 4, L.y + 3, 26, 9);              // 이끼가 가지 끝을 덮음
+      front.fillStyle(0x9cd060, 1).fillEllipse(L.x, L.y + 1, 12, 4);
+      const drip = scene.add.circle(R.x + 18, R.y - 30, 2.5, 0xe0f7ff, 0.95).setDepth(12);
+      scene.tweens.add({ targets: drip, y: R.y - 4, alpha: 0, duration: 900, repeat: -1, repeatDelay: Phaser.Math.Between(600, 1400) });
+    }
+  }
+
+  /* =====================================================================
+   *  7. 부트 씬 — 아이콘 텍스처 생성 후 게임 시작
+   * ===================================================================== */
+  class BootScene extends Phaser.Scene {
+    constructor() { super("BootScene"); }
+    create() {
+      Object.entries(ICON_PAINTERS).forEach(([key, paint]) => {
+        const g = this.make.graphics({ x: 0, y: 0 }, false);
+        paint(g);
+        g.generateTexture(key, 128, 128);
+        g.destroy();
+      });
+      this.scene.launch("UIScene");
+      this.scene.start("IslandScene");
+    }
+  }
+
+  /* =====================================================================
+   *  8. 베이스 씬 — 핫스팟 / 루팅 / 더미 / 전환 / 연출 공통 기능
+   * ===================================================================== */
+  class BaseScene extends Phaser.Scene {
+    initBase() {
+      this.transitioning = false;
+      this.input.on("pointerdown", (p) => { if (p.y < VIEW_H) this.ripple(p.x, p.y); });
+      this.scene.bringToTop("UIScene");
+      this.cameras.main.fadeIn(180, 42, 26, 14);
+    }
+
+    addHotspot(h) {
+      const zone = this.add.zone(h.x, h.y, h.w, h.h).setInteractive({ useHandCursor: true });
+      zone.on("pointerdown", () => this.handleHotspot(h));
+      if (DEBUG) this.add.rectangle(h.x, h.y, h.w, h.h).setStrokeStyle(2, 0xff0055).setDepth(90);
+      h.zone = zone;
+      return h;
+    }
+
+    handleHotspot(h) {
+      if (GameState.busy || this.transitioning) return;
+      if (h.flash !== false) this.flash(h.x, h.y, h.w, h.h);
+      const sel = Inventory.selected;
+      if (sel && !h.ignoreSelection) {
+        const used = h.onUse && h.onUse(sel);
+        if (!used) say(`${josa(ITEMS[sel].name, "은/는")} 여기에 쓸 수 없을 것 같다.`);
+        if (Inventory.selected) Inventory.select(null);
+        return;
+      }
+      if (h.onTap) h.onTap();
+    }
+
+    /** 바닥 아이템 (터치하면 인벤토리로) — flag로 재수집 방지 */
+    addLoot({ flag, item, count = 1, x, y, w = 110, h = 100, angle = 0, sprite, size, plain, depth = 10, hit, msg, onTake }) {
+      if (GameState.flags[flag]) return null;
+      const def = ITEMS[item];
+      const made = typeof sprite === "function" ? sprite() : sprite;   // 이미 주운 경우 그래픽을 만들지 않도록 함수로 받음
+      const c = (made || makeItemSprite(this, item, size, plain)).setPosition(x, y).setAngle(angle).setDepth(depth);
+      const hz = hit || { x, y, w, h };
+      const zone = this.add.zone(hz.x, hz.y, hz.w, hz.h).setInteractive({ useHandCursor: true }).setDepth(depth + 1);
+      if (DEBUG) this.add.rectangle(hz.x, hz.y, hz.w, hz.h).setStrokeStyle(2, 0x00ff99).setDepth(90);
+
+      zone.on("pointerdown", () => {
+        if (GameState.busy || this.transitioning || GameState.flags[flag]) return;
+        if (!Inventory.canAdd(item, count)) {
+          if (Inventory.items.find((i) => i.id === item)) say(`${josa(def.name, "은/는")} 더 이상 들 수 없다.`);
+          else toast("인벤토리가 가득 찼습니다");
+          return;
+        }
+        GameState.flags[flag] = true;
+        zone.destroy();
+        if (Inventory.selected) Inventory.select(null);
+        Inventory.add(item, count, { quiet: true });
+        this.flyToInventory(c, item);
+        toast(def.max > 1
+          ? `✨ ${def.name} +${count}  (${Inventory.count(item)}/${def.max})`
+          : `✨ ${def.name} 획득!`);
+        if (onTake) onTake();
+        if (item === "branch" && Inventory.count("branch") === ITEMS.branch.max) {
+          say("나뭇가지 10개를 전부 모았다! 이제 화로에 불을 피울 수 있겠어.");
+        } else if (msg) {
+          say(...[].concat(msg));
+        }
+      });
+      return { container: c, zone };
+    }
+
+    /** 줍기 연출: 살짝 솟아올라 튕긴 뒤 → 해당 인벤토리 슬롯으로 쏙 빨려 들어감 */
+    flyToInventory(c, item) {
+      const idx = GameState.inventory.findIndex((i) => i.id === item);
+      const dest = slotCenter(Math.max(0, idx));
+      this.tweens.killTweensOf(c);
+      c.setDepth(300);
+      const s = c.scaleX || 1;
+      this.tweens.add({
+        targets: c, y: c.y - 46, angle: 0, scaleX: s * 1.18, scaleY: s * 1.18, duration: 230, ease: "Back.easeOut",
+        onComplete: () => this.tweens.add({
+          targets: c, x: dest.x, y: dest.y - 8, scaleX: s * 0.42, scaleY: s * 0.42, duration: 420, delay: 80, ease: "Cubic.easeIn",
+          onComplete: () => { GameState.events.emit("slot-bump", item); this.destroyDeep(c); },
+        }),
+      });
+    }
+
+    /** 더미 오브젝트 (인벤토리에 들어가지 않고 대사만 출력) */
+    addDummy({ tex, x, y, size = 80, angle = 0, depth = 9, msg, onTap }) {
+      // 투명한 모서리가 다른 물건 터치를 가로채지 않도록 가운데 66%만 터치 영역으로
+      const img = this.add.image(x, y, tex).setDisplaySize(size, size).setAngle(angle).setDepth(depth)
+        .setInteractive({ hitArea: new Phaser.Geom.Rectangle(22, 22, 84, 84), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
+      if (DEBUG) this.add.rectangle(x, y, size * 0.66, size * 0.66).setStrokeStyle(2, 0x60a5fa).setDepth(90).setAngle(angle);
+      img.on("pointerdown", () => {
+        if (GameState.busy || this.transitioning) return;
+        if (Inventory.selected) Inventory.select(null);
+        if (onTap) { onTap(img); return; }
+        this.tweens.add({ targets: img, angle: angle + 8, duration: 70, yoyo: true, repeat: 1, onComplete: () => img.setAngle(angle) });
+        say(msg);
+      });
+      return img;
+    }
+
+    goTo(key) {
+      if (this.transitioning || GameState.busy) return;
+      this.transitioning = true;
+      this.cameras.main.fadeOut(160, 42, 26, 14);
+      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start(key));
+    }
+
+    destroyDeep(obj) {
+      if (obj.list) obj.list.forEach((ch) => this.tweens.killTweensOf(ch));
+      this.tweens.killTweensOf(obj);
+      obj.destroy();
+    }
+
+    addLabel(x, y, text) {
+      return this.add.text(x, y, text, textStyle({
+        fontSize: "15px", fontStyle: "bold", color: C.cream, backgroundColor: "#6b4423", padding: { x: 10, y: 4 },
+      })).setOrigin(0.5, 0).setDepth(5);
+    }
+
+    flash(x, y, w, h) {
+      const g = this.add.graphics().setDepth(80);
+      g.lineStyle(5, 0xffd34d, 1).strokeRoundedRect(x - w / 2, y - h / 2, w, h, 14);
+      this.tweens.add({ targets: g, alpha: 0, duration: 420, onComplete: () => g.destroy() });
+    }
+
+    ripple(x, y) {
+      const c = this.add.circle(x, y, 8).setStrokeStyle(4, 0xfff3c4, 0.95).setDepth(100);
+      this.tweens.add({ targets: c, radius: 34, alpha: 0, duration: 380, ease: "Cubic.easeOut", onComplete: () => c.destroy() });
+    }
+  }
+
+  /** 클로즈업 공통: 상단 우드 간판 제목 + 뒤로가기 버튼 */
+  class CloseupScene extends BaseScene {
+    constructor(key, title) { super(key); this.title = title; }
+
+    create() {
+      GameState.events.emit("hide-dialogue");     // 섬에서 띄운 [조사] 독백은 클로즈업 진입 시 정리
+      this.initBase();
+      this.drawScene();
+      const t = this.add.text(GAME_W / 2, 37, this.title, textStyle({
+        fontSize: "22px", fontStyle: "bold", color: C.cream, stroke: "#3e2410", strokeThickness: 4,
+      })).setOrigin(0.5).setDepth(41);
+      const w = t.width + 56;
+      const sg = this.add.graphics().setDepth(40);
+      drawWood(sg, GAME_W / 2 - w / 2, 14, w, 46, 12);
+      sg.fillStyle(C.woodDark, 1).fillCircle(GAME_W / 2 - w / 2 + 13, 35, 3.5).fillCircle(GAME_W / 2 + w / 2 - 13, 35, 3.5);
+      // 상단 대사창이 떠 있는 동안 제목 간판은 흐리게 (반투명 대사창 뒤로 글자가 겹쳐 보이지 않게)
+      const onDialog = (shown) => this.tweens.add({ targets: [t, sg], alpha: shown ? 0 : 1, duration: 180 });
+      GameState.events.on("dialog", onDialog);
+      this.events.once("shutdown", () => GameState.events.off("dialog", onDialog));
+      setBackButton(() => this.goTo(this.backTo || "IslandScene"));
+    }
+
+    drawScene() {}
+  }
+
+  /* =====================================================================
+   *  9. 메인 무인도 씬
+   * ===================================================================== */
+  /** WebGL 렌더러에서만 postFX(Glow) 사용, Canvas면 후광만 */
+  const isWebGL = (scene) => { try { return scene.sys.game.renderer.type === Phaser.WEBGL; } catch (e) { return false; } };
+
+  /** 4갈래 별 반짝임 */
+  function drawStar(g, s, color = 0xfffbe0) {
+    g.fillStyle(color, 1).fillPoints([
+      { x: 0, y: -s }, { x: s * 0.24, y: -s * 0.24 }, { x: s, y: 0 }, { x: s * 0.24, y: s * 0.24 },
+      { x: 0, y: s }, { x: -s * 0.24, y: s * 0.24 }, { x: -s, y: 0 }, { x: -s * 0.24, y: -s * 0.24 },
+    ], true);
+  }
+
+  class IslandScene extends BaseScene {
+    constructor() { super("IslandScene"); }
+
+    create() {
+      this.initBase();
+      const F = GameState.flags;
+      this.shoreY = (x) => 354 + Math.sin(x / 90) * 8 + Math.sin(x / 37) * 3;
+
+      this.drawSkyAndSea();
+      this.drawBeach();
+      this.objs = {
+        rocks: this.drawLeftCliff(),
+        waterfall: this.drawWaterfall(),
+        tree: this.drawTree(),
+        boat: this.drawBoat(),
+        junk: this.drawJunk(),
+        backpack: this.drawBackpack(),
+        boss: this.drawBoss(!!F.bossAwake),
+      };
+      this.createHotspots();
+
+      [{ flag: "sandBranch1", x: 582, y: 556, angle: -8 }, { flag: "sandBranch2", x: 1012, y: 548, angle: 12 }]
+        .forEach((b) => {
+          nestBranch(this, b.x, b.y, b.angle, "sand");
+          this.addLoot({ ...b, item: "branch", w: 130, h: 70, sprite: () => makeBranchSprite(this, false, true), msg: "모래에 반쯤 묻혀 있던 나뭇가지다. 땔감으로 딱이겠어!" });
+        });
+
+      if (Inventory.has("ramen_cooked") && !F.bossAwake) this.addQuestMarker(300, 452);
+
+      setBackButton(null);
+
+      if (!F.introShown) {
+        F.introShown = true;
+        this.time.delayedCall(500, () => say(
+          narr("…철썩, 철썩. 파도 소리에 눈을 떴다."),
+          "여긴 어디지…? 분명 부장님들이랑 낚시 워크숍 가는 통통배에 타고 있었는데.",
+          "일단 정신 차리자. 반짝이는 곳들을 조사해서… 오늘도 무사히 퇴근해야지!"
+        ));
+      }
+    }
+
+    /* ─────────────── 배경: 하늘 · 해 · 구름 · 바다 ─────────────── */
+    drawSkyAndSea() {
+      const g = this.add.graphics();
+      g.fillGradientStyle(0x5bb8e6, 0x5bb8e6, 0xd4f1fb, 0xd4f1fb, 1).fillRect(0, 0, GAME_W, 252);
+      g.fillStyle(0xfff6d5, 0.25).fillCircle(700, 168, 96);
+      g.fillStyle(0xfff6d5, 0.45).fillCircle(700, 168, 66);
+      g.fillStyle(0xfff1b8, 1).fillCircle(700, 168, 42);
+      g.fillStyle(0xfffbe6, 1).fillCircle(688, 156, 14);
+
+      // 먼 섬 실루엣
+      g.fillStyle(0x93cbc6, 1).fillEllipse(150, 252, 300, 44).fillEllipse(1190, 252, 220, 32);
+      g.fillStyle(0xa9d8d2, 1).fillEllipse(110, 246, 140, 26);
+
+      // 바다 (에메랄드 → 청록)
+      g.fillGradientStyle(0x63dccf, 0x63dccf, 0x1b95a3, 0x1b95a3, 1).fillRect(0, 250, GAME_W, 150);
+      g.fillStyle(0xffffff, 0.55).fillRect(0, 249, GAME_W, 3);
+
+      // 물결 반짝임
+      for (let i = 0; i < 14; i++) {
+        const x = Phaser.Math.Between(20, GAME_W - 20), y = Phaser.Math.Between(262, 330);
+        const s = this.add.rectangle(x, y, Phaser.Math.Between(16, 34), 3, 0xffffff, 0.7);
+        this.tweens.add({ targets: s, alpha: 0.05, x: x + 12, duration: Phaser.Math.Between(1400, 2400), yoyo: true, repeat: -1, delay: i * 140 });
+      }
+      // 햇빛 반사
+      [[700, 262, 110], [700, 276, 80], [700, 290, 56], [700, 304, 34]].forEach(([x, y, w], i) => {
+        const r = this.add.rectangle(x, y, w, 4, 0xfff6d5, 0.75);
+        this.tweens.add({ targets: r, scaleX: 0.7, alpha: 0.35, duration: 1200 + i * 200, yoyo: true, repeat: -1 });
+      });
+
+      // 뭉게구름 (평평한 밑면 + 그림자)
+      [[180, 78, 1], [520, 116, 0.8], [1060, 66, 1.1]].forEach(([x, y, s], i) => {
+        const c = this.add.container(x, y).setScale(s);
+        const cg = this.add.graphics();
+        cg.fillStyle(0xd6ecf6, 1).fillRoundedRect(-70, 4, 140, 20, 10);
+        cg.fillStyle(0xffffff, 1).fillCircle(-38, 4, 26).fillCircle(0, -10, 36).fillCircle(40, 2, 28).fillRoundedRect(-66, -4, 132, 22, 11);
+        cg.fillStyle(0xffffff, 1).fillCircle(-12, -18, 20);
+        c.add(cg);
+        this.tweens.add({ targets: c, x: x + 40, duration: 14000 + i * 3000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      });
+
+      // 갈매기
+      for (let i = 0; i < 3; i++) {
+        const b = this.add.graphics().setPosition(380 + i * 46, 92 + (i % 2) * 18);
+        b.lineStyle(3, 0x35556b, 1).beginPath().arc(-7, 0, 7, Math.PI * 1.1, Math.PI * 1.9).strokePath();
+        b.beginPath().arc(7, 0, 7, Math.PI * 1.1, Math.PI * 1.9).strokePath();
+        this.tweens.add({ targets: b, x: b.x + 160, y: b.y - 14, duration: 16000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+        this.tweens.add({ targets: b, scaleY: 0.6, duration: 380 + i * 60, yoyo: true, repeat: -1 });
+      }
+    }
+
+    /* ─────────────── 모래사장 · 일렁이는 파도 거품 ─────────────── */
+    drawBeach() {
+      const g = this.add.graphics();
+      const shore = this.shoreY;
+      const pts = [{ x: 0, y: GAME_H }];
+      for (let x = 0; x <= GAME_W; x += 16) pts.push({ x, y: shore(x) });
+      pts.push({ x: GAME_W, y: GAME_H });
+      g.fillStyle(0xf3d9a4, 1).fillPoints(pts, true);
+
+      const wet = [];
+      for (let x = 0; x <= GAME_W; x += 16) wet.push({ x, y: shore(x) });
+      for (let x = GAME_W; x >= 0; x -= 16) wet.push({ x, y: shore(x) + 18 + Math.sin(x / 50) * 3 });
+      g.fillStyle(0xe2c088, 0.75).fillPoints(wet, true);
+
+      g.fillStyle(0xf8e7c4, 1).fillEllipse(220, 520, 360, 40).fillEllipse(760, 590, 520, 46).fillEllipse(1130, 520, 300, 36);
+      g.fillStyle(0xdcbf8a, 0.7);
+      for (let i = 0; i < 70; i++) g.fillCircle(Phaser.Math.Between(0, GAME_W), Phaser.Math.Between(400, GAME_H - 6), Phaser.Math.Between(1, 2));
+
+      // 소품: 불가사리, 조개, 조약돌
+      const star = (x, y, r, col) => {
+        const p = [];
+        for (let i = 0; i < 10; i++) {
+          const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.45 : r;
+          p.push({ x: x + Math.cos(a) * rr, y: y + Math.sin(a) * rr });
+        }
+        g.fillStyle(0x7a4a24, 0.5).fillPoints(p.map((q) => ({ x: q.x + 2, y: q.y + 2 })), true);
+        g.fillStyle(col, 1).fillPoints(p, true);
+      };
+      star(470, 600, 13, 0xf28b5b);
+      star(1240, 470, 10, 0xf6a96b);
+      g.fillStyle(0xf9c6d3, 1).fillEllipse(880, 610, 18, 12).fillEllipse(60, 430, 14, 10);
+      g.fillStyle(0xbdb6ab, 1).fillEllipse(300, 600, 14, 9).fillEllipse(1080, 610, 12, 8).fillEllipse(720, 520, 10, 7);
+
+      // 파도 거품 2겹 — 천천히 좌우로 일렁임
+      const foam = (offset, width, alpha) => {
+        const f = this.add.graphics();
+        const fp = [];
+        for (let x = -60; x <= GAME_W + 60; x += 16) fp.push({ x, y: shore(x) + offset });
+        f.lineStyle(width, 0xffffff, alpha).strokePoints(fp);
+        f.fillStyle(0xffffff, alpha);
+        for (let x = -40; x < GAME_W + 40; x += Phaser.Math.Between(40, 70)) f.fillCircle(x, shore(x) + offset + 4, Phaser.Math.Between(3, 6));
+        return f;
+      };
+      const f1 = foam(-2, 6, 0.95);
+      const f2 = foam(9, 3, 0.6);
+      this.tweens.add({ targets: f1, x: 18, y: 3, duration: 3200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.tweens.add({ targets: f2, x: -22, alpha: 0.3, duration: 2600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
+
+    /* ─────────────── 왼쪽 바위 절벽 + 돌무더기 ─────────────── */
+    drawLeftCliff() {
+      const c = this.add.container(0, 0);
+      const g = this.add.graphics();
+      c.add(g);
+      const O = 0x3b2f2a;
+      const mass = [{ x: 284, y: 410 }, { x: 294, y: 252 }, { x: 328, y: 168 }, { x: 392, y: 118 }, { x: 470, y: 110 },
+        { x: 532, y: 148 }, { x: 568, y: 220 }, { x: 586, y: 300 }, { x: 594, y: 410 }];
+      g.fillStyle(0x000000, 0.15).fillEllipse(440, 414, 340, 26);
+      g.fillStyle(0x8a7564, 1).fillPoints(mass, true);
+      g.fillStyle(0xa58d77, 1).fillPoints([{ x: 294, y: 252 }, { x: 328, y: 168 }, { x: 392, y: 118 }, { x: 404, y: 176 }, { x: 354, y: 252 }, { x: 336, y: 410 }, { x: 284, y: 410 }], true);
+      g.fillStyle(0x6e5b4d, 1).fillPoints([{ x: 532, y: 148 }, { x: 568, y: 220 }, { x: 586, y: 300 }, { x: 594, y: 410 }, { x: 526, y: 410 }, { x: 544, y: 282 }, { x: 508, y: 190 }], true);
+      g.fillStyle(0x97806c, 1).fillPoints([{ x: 404, y: 176 }, { x: 470, y: 150 }, { x: 508, y: 190 }, { x: 470, y: 222 }, { x: 410, y: 214 }], true);
+      g.lineStyle(3, 0x5a4a3f, 0.8).lineBetween(354, 252, 380, 300).lineBetween(470, 222, 490, 250).lineBetween(544, 282, 560, 340);
+      // 동굴처럼 움푹한 벽면 + 숯 낙서 흔적
+      g.fillStyle(0x4a3c33, 1).fillEllipse(442, 296, 134, 96);
+      g.fillStyle(0x3a2f28, 1).fillEllipse(442, 304, 108, 72);
+      g.lineStyle(2, 0xe7e2da, 0.55).lineBetween(410, 288, 430, 286).lineBetween(436, 290, 456, 284).lineBetween(414, 304, 444, 302).lineBetween(450, 306, 472, 300);
+      // 잔디 뚜껑
+      g.fillStyle(0x4f7f3a, 1).fillPoints([{ x: 324, y: 176 }, { x: 392, y: 124 }, { x: 470, y: 116 }, { x: 534, y: 154 }, { x: 524, y: 172 }, { x: 470, y: 140 }, { x: 400, y: 146 }, { x: 342, y: 188 }], true);
+      g.fillStyle(0x7cb342, 1).fillPoints([{ x: 328, y: 168 }, { x: 392, y: 118 }, { x: 470, y: 110 }, { x: 532, y: 148 }, { x: 520, y: 158 }, { x: 470, y: 128 }, { x: 400, y: 134 }, { x: 340, y: 176 }], true);
+      g.lineStyle(5, O, 1).strokePoints(mass, false);
+
+      // 돌무더기 (외곽선 + 하이라이트)
+      [[372, 392, 26], [418, 384, 34], [470, 396, 26], [444, 354, 22], [398, 360, 18], [506, 400, 16]].forEach(([x, y, r]) => {
+        g.fillStyle(O, 1).fillCircle(x, y, r + 3);
+        g.fillStyle(0x8f8b85, 1).fillCircle(x, y + 2, r);
+        g.fillStyle(0xb5b0a8, 1).fillCircle(x, y - 1, r - 3);
+        g.fillStyle(0xd8d3cb, 1).fillEllipse(x - r * 0.35, y - r * 0.42, r * 0.7, r * 0.34);
+      });
+      // 절벽 밑 풀
+      this.grassTuft(g, 300, 412); this.grassTuft(g, 580, 414); this.grassTuft(g, 340, 418);
+      return c;
+    }
+
+    grassTuft(g, x, y) {
+      g.fillStyle(0x4f7f3a, 1).fillTriangle(x - 12, y, x - 6, y - 22, x, y).fillTriangle(x - 4, y, x + 4, y - 28, x + 10, y);
+      g.fillStyle(0x7cb342, 1).fillTriangle(x + 4, y, x + 12, y - 18, x + 18, y);
+    }
+
+    /* ─────────────── 오른쪽 절벽 + 작은 폭포 (물안개) ─────────────── */
+    drawWaterfall() {
+      const c = this.add.container(0, 0);
+      const g = this.add.graphics();
+      c.add(g);
+      const O = 0x3b2f2a;
+      const mass = [{ x: 842, y: 410 }, { x: 852, y: 222 }, { x: 876, y: 142 }, { x: 930, y: 96 }, { x: 1000, y: 100 },
+        { x: 1040, y: 160 }, { x: 1056, y: 262 }, { x: 1062, y: 410 }];
+      g.fillStyle(0x000000, 0.15).fillEllipse(952, 414, 240, 24);
+      g.fillStyle(0x7d6a5b, 1).fillPoints(mass, true);
+      g.fillStyle(0x9c8571, 1).fillPoints([{ x: 852, y: 222 }, { x: 876, y: 142 }, { x: 930, y: 96 }, { x: 912, y: 180 }, { x: 890, y: 300 }, { x: 884, y: 410 }, { x: 842, y: 410 }], true);
+      g.fillStyle(0x625144, 1).fillPoints([{ x: 1000, y: 100 }, { x: 1040, y: 160 }, { x: 1056, y: 262 }, { x: 1062, y: 410 }, { x: 1010, y: 410 }, { x: 1018, y: 240 }], true);
+      g.fillStyle(0x7cb342, 1).fillPoints([{ x: 876, y: 142 }, { x: 930, y: 96 }, { x: 1000, y: 100 }, { x: 1040, y: 160 }, { x: 1026, y: 166 }, { x: 996, y: 118 }, { x: 934, y: 114 }, { x: 888, y: 152 }], true);
+      g.fillStyle(0x5d8f3c, 1).fillEllipse(1046, 230, 26, 40).fillEllipse(866, 300, 22, 36);
+      g.lineStyle(5, O, 1).strokePoints(mass, false);
+      // 절벽 틈
+      g.fillStyle(0x2f2620, 1).fillEllipse(943, 112, 52, 18);
+
+      // 물줄기 (위는 좁고 아래로 퍼짐)
+      g.fillStyle(0xd9f6ff, 1).fillPoints([{ x: 924, y: 112 }, { x: 962, y: 112 }, { x: 976, y: 392 }, { x: 910, y: 392 }], true);
+      g.fillStyle(0xa5e8f7, 1).fillPoints([{ x: 948, y: 114 }, { x: 960, y: 114 }, { x: 972, y: 392 }, { x: 954, y: 392 }], true);
+      g.fillStyle(0xffffff, 1).fillPoints([{ x: 928, y: 114 }, { x: 936, y: 114 }, { x: 930, y: 392 }, { x: 918, y: 392 }], true);
+      for (let i = 0; i < 9; i++) {
+        const s = this.add.rectangle(922 + (i % 4) * 12, 118, 4, Phaser.Math.Between(24, 40), 0xffffff, 0.9);
+        c.add(s);
+        this.tweens.add({ targets: s, y: 380, x: s.x + (i % 4 - 1.5) * 6, duration: 820, delay: i * 95, repeat: -1 });
+      }
+      // 웅덩이
+      g.fillStyle(0x1f9aa6, 1).fillEllipse(943, 400, 190, 46);
+      g.fillStyle(0x56d3cb, 1).fillEllipse(943, 396, 172, 36);
+      g.fillStyle(0xbff3ef, 1).fillEllipse(916, 392, 50, 8);
+      // 물안개 · 거품
+      for (let i = 0; i < 6; i++) {
+        const m = this.add.circle(906 + i * 15, 388, Phaser.Math.Between(12, 20), 0xffffff, 0.85);
+        c.add(m);
+        this.tweens.add({ targets: m, scale: { from: 0.7, to: 1.25 }, alpha: { from: 0.9, to: 0.25 }, y: 380, duration: 700 + i * 110, yoyo: true, repeat: -1 });
+      }
+      this.time.addEvent({
+        delay: 260, loop: true, callback: () => {
+          const d = this.add.circle(943 + Phaser.Math.Between(-30, 30), 386, Phaser.Math.Between(2, 4), 0xffffff, 0.9);
+          c.add(d);
+          this.tweens.add({ targets: d, x: d.x + Phaser.Math.Between(-40, 40), y: 360 + Phaser.Math.Between(-14, 6), alpha: 0, duration: 650, ease: "Quad.easeOut", onComplete: () => d.destroy() });
+        },
+      });
+      return c;
+    }
+
+    /* ─────────────── 떡갈나무 (구불구불 줄기 + 2단 음영 잎) ─────────────── */
+    drawTree() {
+      const c = this.add.container(0, 0);
+      const g = this.add.graphics();
+      c.add(g);
+      const F = GameState.flags;
+      g.fillStyle(0x000000, 0.16).fillEllipse(152, 480, 210, 28);
+
+      // 굽은 줄기 (중심선 → 좌우 윤곽)
+      const spine = [[140, 478, 40], [130, 440, 34], [146, 396, 30], [128, 350, 27], [146, 304, 24], [136, 262, 21], [142, 226, 18]];
+      const left = spine.map(([x, y, w]) => ({ x: x - w / 2, y }));
+      const right = spine.map(([x, y, w]) => ({ x: x + w / 2, y })).reverse();
+      const trunk = [...left, ...right];
+      g.fillStyle(0x3e2a1c, 1).fillPoints(trunk.map((p, i) => ({ x: p.x + (i < left.length ? -4 : 4), y: p.y })), true);
+      g.fillStyle(0x6d4c33, 1).fillPoints(trunk, true);
+      g.lineStyle(6, 0x8d6748, 1).strokePoints(spine.map(([x, y, w]) => ({ x: x - w / 2 + 6, y })));
+      g.lineStyle(4, 0x4e3524, 1).strokePoints(spine.map(([x, y, w]) => ({ x: x + w / 2 - 6, y })));
+      g.fillStyle(0x6d4c33, 1).fillTriangle(116, 478, 92, 486, 126, 452).fillTriangle(164, 478, 192, 488, 156, 450);
+      // 가지
+      K.stickOutline(g, 138, 300, 82, 236, 12); K.stickOutline(g, 140, 276, 206, 222, 11);
+      K.stickFill(g, 138, 300, 82, 236, 12, 0x6d4c33); K.stickFill(g, 140, 276, 206, 222, 11, 0x6d4c33);
+      if (!F.treeTwig1 || !F.treeTwig2) {
+        K.stickOutline(g, 152, 380, 184, 362, 5); K.stickOutline(g, 124, 404, 96, 390, 5);
+        K.stickFill(g, 152, 380, 184, 362, 5, 0x8d6748); K.stickFill(g, 124, 404, 96, 390, 5, 0x8d6748);
+      }
+      // 잎사귀 덩어리 (외곽선 → 어두운 잎 → 밝은 잎 → 하이라이트)
+      const clumps = [[140, 172, 70], [78, 214, 52], [206, 210, 54], [110, 118, 48], [178, 126, 50], [142, 236, 48], [58, 172, 40], [226, 164, 42]];
+      clumps.forEach(([x, y, r]) => g.fillStyle(0x2f5a27, 1).fillCircle(x, y, r + 5));
+      clumps.forEach(([x, y, r]) => g.fillStyle(0x4f8f3a, 1).fillCircle(x, y, r));
+      clumps.forEach(([x, y, r]) => g.fillStyle(0x76b947, 1).fillCircle(x - r * 0.16, y - r * 0.2, r * 0.74));
+      clumps.forEach(([x, y, r]) => g.fillStyle(0xa5d86e, 1).fillCircle(x - r * 0.36, y - r * 0.42, r * 0.18));
+      // 도토리
+      [[96, 250], [184, 256], [150, 108]].forEach(([x, y]) => {
+        g.fillStyle(0x3e2a1c, 1).fillEllipse(x, y + 4, 14, 18);
+        g.fillStyle(0xb7783d, 1).fillEllipse(x, y + 4, 10, 14);
+        g.fillStyle(0x6d4c33, 1).fillEllipse(x, y - 3, 14, 7);
+      });
+      return c;
+    }
+
+    /* ─────────────── 난파된 통통배 (비스듬히 박힘 + 찢어진 깃발) ─────────────── */
+    drawBoat() {
+      const c = this.add.container(0, 0);
+      const g = this.add.graphics();
+      c.add(g);
+      const O = 0x3b2a1c;
+      const F = GameState.flags;
+      g.fillStyle(0x000000, 0.16).fillEllipse(1172, 452, 250, 26);
+      // 돛대
+      K.stickOutline(g, 1112, 372, 1098, 230, 8);
+      K.stickFill(g, 1112, 372, 1098, 230, 8, 0x8d6748);
+      // 선체
+      const hull = [{ x: 1064, y: 370 }, { x: 1278, y: 338 }, { x: 1262, y: 408 }, { x: 1234, y: 440 }, { x: 1110, y: 452 }];
+      g.fillStyle(0x8d5a34, 1).fillPoints(hull, true);
+      g.fillStyle(0x6e4426, 1).fillPoints([{ x: 1110, y: 452 }, { x: 1234, y: 440 }, { x: 1262, y: 408 }, { x: 1250, y: 404 }, { x: 1112, y: 426 }], true);
+      g.lineStyle(3, 0x6e4426, 1).lineBetween(1076, 392, 1268, 362).lineBetween(1090, 414, 1262, 386);
+      g.lineStyle(10, 0xc08a50, 1).lineBetween(1066, 372, 1276, 340);
+      g.fillStyle(0x2a1c12, 1).fillPoints([{ x: 1136, y: 410 }, { x: 1170, y: 404 }, { x: 1162, y: 426 }, { x: 1140, y: 428 }], true);
+      g.lineStyle(5, O, 1).strokePoints(hull, true, true);
+      // 조타실
+      const cabin = [{ x: 1150, y: 352 }, { x: 1234, y: 340 }, { x: 1230, y: 288 }, { x: 1158, y: 296 }];
+      g.fillStyle(0xf1e3c6, 1).fillPoints(cabin, true);
+      g.fillStyle(0xd9c7a2, 1).fillPoints([{ x: 1212, y: 342 }, { x: 1234, y: 340 }, { x: 1230, y: 288 }, { x: 1210, y: 290 }], true);
+      g.fillStyle(0xc0392b, 1).fillPoints([{ x: 1152, y: 300 }, { x: 1236, y: 290 }, { x: 1234, y: 280 }, { x: 1154, y: 288 }], true);
+      g.lineStyle(4, O, 1).strokePoints(cabin, true, true);
+      g.fillStyle(0x1e293b, 1).fillRect(1170, 312, 26, 20);
+      g.fillStyle(0x93c5fd, 0.6).fillRect(1172, 314, 8, 8);
+      // 안테나 + LED
+      g.lineStyle(3, 0x334155, 1).lineBetween(1222, 290, 1230, 246);
+      const radioLed = this.add.circle(1188, 326, 3.5, F.radioUnlocked ? 0x22c55e : 0xef4444);
+      const antennaLed = this.add.circle(1230, 246, 4.5, 0xef4444);
+      c.add([radioLed, antennaLed]);
+      this.tweens.add({ targets: [radioLed, antennaLed], alpha: 0.15, duration: 700, yoyo: true, repeat: -1 });
+      // 찢어진 깃발 (펄럭임)
+      const flag = this.add.graphics().setPosition(1098, 236);
+      flag.fillStyle(O, 1).fillPoints([{ x: 0, y: -4 }, { x: 60, y: 6 }, { x: 46, y: 14 }, { x: 58, y: 22 }, { x: 40, y: 26 }, { x: 50, y: 34 }, { x: 0, y: 40 }], true);
+      flag.fillStyle(0xe5533d, 1).fillPoints([{ x: 2, y: 0 }, { x: 52, y: 8 }, { x: 40, y: 14 }, { x: 50, y: 21 }, { x: 34, y: 24 }, { x: 42, y: 31 }, { x: 2, y: 36 }], true);
+      flag.fillStyle(0xf28b7a, 1).fillPoints([{ x: 2, y: 0 }, { x: 52, y: 8 }, { x: 30, y: 10 }, { x: 2, y: 8 }], true);
+      c.add(flag);
+      this.tweens.add({ targets: flag, scaleX: 0.82, scaleY: 1.05, duration: 520, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      // 배를 덮은 모래 둔덕
+      g.fillStyle(0xe2c088, 1).fillEllipse(1166, 458, 260, 34);
+      g.fillStyle(0xf3d9a4, 1).fillEllipse(1160, 456, 236, 26);
+      g.fillStyle(0xf8e7c4, 1).fillEllipse(1130, 450, 110, 10);
+      return c;
+    }
+
+    /* ─────────────── 물건더미 & 화로 ─────────────── */
+    drawJunk() {
+      const c = this.add.container(0, 0);
+      const g = this.add.graphics();
+      c.add(g);
+      const O = 0x3b2a1c;
+      const F = GameState.flags;
+      g.fillStyle(0x000000, 0.16).fillEllipse(620, 482, 240, 26);
+      const crate = (x, y, w, h, col) => {
+        g.fillStyle(O, 1).fillRect(x - 3, y - 3, w + 6, h + 6);
+        g.fillStyle(col, 1).fillRect(x, y, w, h);
+        g.fillStyle(0x7a4a24, 1).fillRect(x, y + h - 8, w, 8);
+        g.fillStyle(0xdcae7c, 1).fillRect(x + 3, y + 3, w - 6, 4);
+        g.lineStyle(3, 0x7a4a24, 1).strokeRect(x + 6, y + 6, w - 12, h - 16).lineBetween(x + 6, y + 6, x + w - 6, y + h - 10);
+      };
+      crate(518, 398, 66, 64, 0xb5835a);
+      crate(530, 354, 50, 44, 0xa47148);
+      // 화로
+      g.fillStyle(0x2a211c, 1).fillEllipse(676, 456, 96, 30);
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        const x = 676 + Math.cos(a) * 54, y = 456 + Math.sin(a) * 20;
+        g.fillStyle(O, 1).fillCircle(x, y, 12);
+        g.fillStyle(0x9a958d, 1).fillCircle(x, y + 1, 10);
+        g.fillStyle(0xcfc9c0, 1).fillCircle(x - 3, y - 3, 3);
+      }
+      K.stickOutline(g, 642, 452, 676, 398, 4); K.stickOutline(g, 710, 452, 676, 398, 4);
+      K.stickFill(g, 642, 452, 676, 398, 4, 0x8d6748); K.stickFill(g, 710, 452, 676, 398, 4, 0x8d6748);
+      const step = F.brazierStep || 0;
+      if (step >= 3) {
+        [[0xf97316, 36, 48], [0xfbbf24, 22, 32], [0xfff7ae, 10, 16]].forEach(([col, w, h]) => {
+          const fl = this.add.ellipse(676, 456, w, h, col, 0.95).setOrigin(0.5, 1);
+          c.add(fl);
+          this.tweens.add({ targets: fl, scaleY: 1.25, duration: 200 + w * 3, yoyo: true, repeat: -1 });
+        });
+      }
+      if (step >= 4) c.add(this.add.image(676, 410, step === 4 ? "icon_pot_water" : "icon_pot_empty").setDisplaySize(52, 52));
+      return c;
+    }
+
+    /* ─────────────── 배낭 ─────────────── */
+    drawBackpack() {
+      const c = this.add.container(0, 0);
+      const g = this.add.graphics();
+      c.add(g);
+      const O = 0x2b3a14;
+      const open = !!GameState.flags.bagOpen;
+      g.fillStyle(0x000000, 0.16).fillEllipse(804, 502, 120, 20);
+      g.fillStyle(O, 1).fillRoundedRect(760, 402, 82, 100, 22);
+      g.fillStyle(0x5e8c2a, 1).fillRoundedRect(764, 406, 74, 92, 18);
+      g.fillStyle(0x4a7322, 1).fillRoundedRect(764, 466, 74, 32, { tl: 0, tr: 0, bl: 18, br: 18 });
+      g.fillStyle(0x7fb043, 1).fillRoundedRect(770, 438, 8, 34, 4);
+      g.fillStyle(O, 1).fillRoundedRect(774, 450, 54, 38, 9);
+      g.fillStyle(0x4f7a22, 1).fillRoundedRect(777, 453, 48, 32, 7);
+      if (open) {
+        g.fillStyle(O, 1).fillEllipse(801, 410, 72, 22);
+        g.fillStyle(0x1a2e05, 1).fillEllipse(801, 410, 64, 16);
+        g.fillStyle(0xf8fafc, 1).fillRoundedRect(806, 392, 12, 20, 4);       // 삐져나온 양말
+        g.fillStyle(0xef4444, 1).fillRect(806, 392, 12, 6);
+      } else {
+        g.fillStyle(O, 1).fillRoundedRect(765, 396, 72, 42, 16);
+        g.fillStyle(0x4f7a22, 1).fillRoundedRect(768, 399, 66, 36, 14);
+        g.fillStyle(0x7fb043, 1).fillRoundedRect(776, 403, 50, 6, 3);
+        g.fillStyle(O, 1).fillRoundedRect(789, 425, 24, 20, 4);
+        g.fillStyle(0xe8b923, 1).fillRoundedRect(791, 427, 20, 16, 3);
+        g.lineStyle(3, 0xb8860b).beginPath().arc(801, 427, 6, Math.PI, 0).strokePath();
+      }
+      g.lineStyle(4, 0x3b5a18).lineBetween(780, 436, 776, 494).lineBetween(822, 436, 826, 494);
+      return c;
+    }
+
+    /* ─────────────── 이영현 부장님 (대자로 뻗음 / 기상) ─────────────── */
+    drawBoss(awake) {
+      const c = this.add.container(0, 0);
+      const g = this.add.graphics();
+      c.add(g);
+      const O = 0x2b1d14;
+      if (!awake) {
+        g.fillStyle(0x000000, 0.16).fillEllipse(330, 536, 300, 70);
+        // 팔다리 (대자)
+        [[300, 512, 286, 476], [300, 548, 286, 584], [356, 520, 420, 488], [356, 540, 420, 572]].forEach(([a, b, x, y]) => K.stickOutline(g, a, b, x, y, 14));
+        [[300, 512, 286, 476], [300, 548, 286, 584]].forEach(([a, b, x, y]) => K.stickFill(g, a, b, x, y, 14, 0x2c4a9a));
+        [[356, 520, 420, 488], [356, 540, 420, 572]].forEach(([a, b, x, y]) => K.stickFill(g, a, b, x, y, 14, 0x3f4756));
+        [[284, 472], [284, 588]].forEach(([x, y]) => { g.fillStyle(O, 1).fillCircle(x, y, 10); g.fillStyle(0xf6c99c, 1).fillCircle(x, y, 7.5); });
+        [[426, 484], [426, 576]].forEach(([x, y]) => { g.fillStyle(O, 1).fillEllipse(x, y, 26, 18); g.fillStyle(0x1f1a17, 1).fillEllipse(x, y, 21, 13); g.fillStyle(0x57534e, 1).fillEllipse(x - 3, y - 3, 7, 3); });
+        // 몸통 (정장)
+        g.fillStyle(O, 1).fillRoundedRect(276, 504, 92, 54, 18);
+        g.fillStyle(0x2c4a9a, 1).fillRoundedRect(279, 507, 86, 48, 16);
+        g.fillStyle(0x3f63c0, 1).fillRoundedRect(283, 510, 78, 12, 6);
+        g.fillStyle(0xffffff, 1).fillTriangle(280, 516, 312, 531, 280, 546);
+        g.fillStyle(0xd83a2e, 1).fillTriangle(286, 527, 334, 523, 334, 539);
+        g.fillStyle(0xd83a2e, 1).fillTriangle(286, 535, 334, 523, 334, 539);
+        // 머리 (큰 카툰 머리)
+        g.fillStyle(O, 1).fillCircle(248, 530, 31);
+        g.fillStyle(0xf6c99c, 1).fillCircle(248, 530, 28);
+        g.fillStyle(0xffdcb6, 1).fillEllipse(256, 520, 22, 12);
+        g.fillStyle(0x2b2522, 1).fillEllipse(228, 530, 18, 50);
+        g.fillStyle(0x2b2522, 1).fillTriangle(222, 506, 236, 498, 234, 514);
+        g.lineStyle(3, O, 1).lineBetween(250, 515, 258, 523).lineBetween(258, 515, 250, 523).lineBetween(250, 537, 258, 545).lineBetween(258, 537, 250, 545);
+        g.fillStyle(0x9a3412, 1).fillEllipse(268, 530, 8, 10);
+        g.fillStyle(0xf28b7a, 0.6).fillCircle(262, 512, 4).fillCircle(262, 548, 4);
+        // 꼬르륵 효과
+        this.time.addEvent({
+          delay: 6500, loop: true, callback: () => {
+            const tx = this.add.text(318, 492, "꼬르륵…", textStyle({ fontSize: "16px", fontStyle: "bold", stroke: "#3e2410", strokeThickness: 4 })).setOrigin(0.5).setAlpha(0);
+            this.tweens.add({ targets: tx, y: 462, alpha: { from: 0, to: 0.95 }, duration: 700, yoyo: true, hold: 600, onComplete: () => tx.destroy() });
+          },
+        });
+        // 기절 빙글빙글 별
+        const dizzy = this.add.text(244, 490, "✦  ✧", textStyle({ fontSize: "16px", color: "#fde68a", stroke: "#7a4a24", strokeThickness: 3 })).setOrigin(0.5);
+        c.add(dizzy);
+        this.tweens.add({ targets: dizzy, angle: 360, duration: 3000, repeat: -1 });
+      } else {
+        g.fillStyle(0x000000, 0.16).fillEllipse(368, 562, 230, 26);
+        K.stickOutline(g, 350, 540, 440, 548, 18);
+        K.stickFill(g, 350, 540, 440, 548, 18, 0x3f4756);
+        g.fillStyle(O, 1).fillEllipse(452, 542, 22, 30);
+        g.fillStyle(0x1f1a17, 1).fillEllipse(452, 542, 17, 25);
+        g.fillStyle(O, 1).fillRoundedRect(300, 462, 70, 92, 18);
+        g.fillStyle(0x2c4a9a, 1).fillRoundedRect(303, 465, 64, 86, 16);
+        g.fillStyle(0xffffff, 1).fillTriangle(320, 466, 350, 466, 335, 494);
+        g.fillStyle(0xd83a2e, 1).fillTriangle(330, 470, 340, 470, 335, 508);
+        K.stickOutline(g, 360, 486, 412, 494, 12);
+        K.stickFill(g, 360, 486, 412, 494, 12, 0x2c4a9a);
+        g.fillStyle(O, 1).fillCircle(416, 494, 10); g.fillStyle(0xf6c99c, 1).fillCircle(416, 494, 7.5);
+        g.fillStyle(O, 1).fillCircle(335, 436, 31);
+        g.fillStyle(0xf6c99c, 1).fillCircle(335, 436, 28);
+        g.fillStyle(0x2b2522, 1).fillEllipse(335, 414, 52, 20);
+        g.lineStyle(3, O, 1).beginPath().arc(324, 438, 5, Math.PI * 1.1, Math.PI * 1.9).strokePath();
+        g.beginPath().arc(346, 438, 5, Math.PI * 1.1, Math.PI * 1.9).strokePath();
+        g.beginPath().arc(335, 448, 8, 0.2, Math.PI - 0.2).strokePath();
+        g.fillStyle(0xf28b7a, 0.6).fillCircle(318, 448, 5).fillCircle(352, 448, 5);
+        const bubble = this.add.text(476, 466, "📻 무전기!", textStyle({ fontSize: "16px", fontStyle: "bold", color: C.ink, backgroundColor: "#ffc53d", padding: { x: 8, y: 4 } })).setOrigin(0.5);
+        c.add(bubble);
+        this.tweens.add({ targets: bubble, y: 458, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      }
+      return c;
+    }
+
+    /* ─────────────── 핫스팟: 라벨 없음 · 반짝임 힌트 · 발광 하이라이트 ─────────────── */
+    createHotspots() {
+      const F = GameState.flags;
+      const SPOTS = [
+        { key: "tree", x: 140, y: 300, w: 240, h: 340, spark: [150, 200], scene: "CLOSEUP_TREE",
+          inspect: "바닷바람에 구불구불 휘어진 떡갈나무다. 자세히 살펴볼까?" },
+        { key: "rocks", x: 440, y: 300, w: 260, h: 210, spark: [442, 300], scene: "CLOSEUP_ROCKS",
+          inspect: "절벽 아래 돌무더기… 움푹한 벽면에 숯으로 뭔가 적혀 있는 것 같다. 가까이 가 볼까?" },
+        { key: "junk", x: 615, y: 425, w: 210, h: 120, spark: [632, 410], scene: "CLOSEUP_JUNK",
+          inspect: "파도에 떠밀려 온 잡동사니와 낡은 화로다. 쓸 만한 게 있을지도?" },
+        { key: "backpack", x: 801, y: 448, w: 110, h: 116, spark: [801, 436], scene: "CLOSEUP_BAG",
+          inspect: "모래 위에 버려진 등산 배낭이다. 누구 거지?" },
+        { key: "waterfall", x: 950, y: 250, w: 200, h: 310, spark: [943, 240], scene: "CLOSEUP_WATERFALL",
+          inspect: "절벽 틈에서 시원한 물줄기가 쏟아진다. 가까이 가 볼까?" },
+        { key: "boat", x: 1170, y: 370, w: 210, h: 190, spark: [1190, 316], scene: "CLOSEUP_BOAT",
+          inspect: "우리가 타고 온 통통배… 모래에 처박혀 버렸다. 안을 살펴보자." },
+      ];
+      this.spots = SPOTS.map((s) => {
+        const h = this.addHotspot({ ...s, flash: false, ignoreSelection: true, onTap: () => this.inspect(h) });
+        this.wireHover(h);
+        this.addSparkle(s.spark[0], s.spark[1]);
+        return h;
+      });
+
+      const bossAwake = !!F.bossAwake;
+      const boss = this.addHotspot({
+        key: "boss", flash: false,
+        x: bossAwake ? 372 : 340, y: bossAwake ? 500 : 532, w: bossAwake ? 230 : 290, h: bossAwake ? 130 : 110,
+        onTap: () => {
+          this.pulse(boss);
+          if (GameState.flags.bossAwake) {
+            say(line("이영현 부장", `${GameState.playerName}사원! 무전기 비밀번호는 AI가 텍스트를 처리하는 기본 단위 이름이야. 어서!`));
+          } else {
+            say("의식을 잃고 계신다... 배에서 꼬르륵 소리가 난다.");
+          }
+        },
+        onUse: (itemId) => {
+          this.pulse(boss);
+          if (GameState.flags.bossAwake) return false;
+          if (itemId === "ramen_cooked") { this.openRamenChoice(); return true; }
+          if (itemId === "cutlery") { say("수저만 드려서는 소용없다. 드실 게 필요해!"); return true; }
+          if (itemId === "ramen_raw") { say("생라면을 드릴 순 없지… 제대로 끓여 와야겠다."); return true; }
+          return false;
+        },
+      });
+      this.wireHover(boss);
+      this.addSparkle(bossAwake ? 335 : 300, bossAwake ? 440 : 528);
+      this.spots.push(boss);
+    }
+
+    /** 퀘스트 안내 마커 (부장님 머리 위에서 통통 튀는 라면 말풍선) */
+    addQuestMarker(x, y) {
+      const m = this.add.container(x, y).setDepth(26);
+      const g = this.add.graphics();
+      g.fillStyle(C.outline, 1).fillRoundedRect(-36, -36, 72, 58, 16).fillTriangle(-12, 20, 12, 20, 0, 38);
+      g.fillStyle(C.paper, 1).fillRoundedRect(-32, -32, 64, 50, 13).fillTriangle(-8, 16, 8, 16, 0, 31);
+      g.fillStyle(0xffc53d, 1).fillRoundedRect(-32, -32, 64, 8, { tl: 13, tr: 13, bl: 0, br: 0 });
+      m.add([g, this.add.image(0, -5, "icon_ramen_cooked").setDisplaySize(44, 44)]);
+      this.tweens.add({ targets: m, y: y - 12, duration: 520, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      return m;
+    }
+
+    /** 오브젝트 키 → 그려진 컨테이너 */
+    targetOf(h) { return this.objs[h.key]; }
+
+    wireHover(h) {
+      // 은은한 후광 (Canvas/WebGL 공통)
+      h.halo = this.add.ellipse(h.x, h.y + h.h * 0.08, h.w * 1.05, h.h * 0.95, 0xfff2b3, 1)
+        .setAlpha(0).setBlendMode(Phaser.BlendModes.ADD).setDepth(1);
+      h.zone.on("pointerover", () => this.setHighlight(h, true));
+      h.zone.on("pointerout", () => { if (!this.transitioning) this.setHighlight(h, false); });
+    }
+
+    setHighlight(h, on) {
+      if (h.lit === on) return;
+      h.lit = on;
+      this.tweens.killTweensOf(h.halo);
+      this.tweens.add({ targets: h.halo, alpha: on ? 0.22 : 0, duration: 180 });
+      const obj = this.targetOf(h);
+      if (!obj || !isWebGL(this) || !obj.postFX) return;
+      try {
+        if (on && !h.glowFx) {
+          h.glowFx = obj.postFX.addGlow(0xfff2b3, 0, 0, false, 0.1, 14);
+          this.tweens.add({ targets: h.glowFx, outerStrength: 5, duration: 180 });
+        } else if (!on && h.glowFx) {
+          obj.postFX.remove(h.glowFx);
+          h.glowFx = null;
+        }
+      } catch (e) { /* 일부 기기에서 FX 미지원 → 후광만 사용 */ }
+    }
+
+    pulse(h) {
+      this.setHighlight(h, true);
+      this.time.delayedCall(650, () => this.setHighlight(h, false));
+    }
+
+    /** [조사] 독백 → 잠시 후 클로즈업 전환 */
+    inspect(h) {
+      if (this.transitioning || GameState.busy) return;
+      this.transitioning = true;
+      this.setHighlight(h, true);
+      say(line(GameState.playerName, `[조사] ${h.inspect}`));
+      this.time.delayedCall(1100, () => {
+        this.cameras.main.fadeOut(220, 42, 26, 14);
+        this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start(h.scene));
+      });
+    }
+
+    /** 2~3초 간격으로 은은하게 깜빡이는 별 반짝임 */
+    addSparkle(x, y) {
+      const spawn = () => {
+        const s = this.add.graphics().setPosition(x + Phaser.Math.Between(-10, 10), y + Phaser.Math.Between(-10, 10)).setDepth(30).setScale(0).setAlpha(0);
+        s.fillStyle(0xfff3b0, 0.35).fillCircle(0, 0, 12);
+        drawStar(s, 11);
+        s.fillStyle(0xffffff, 1).fillCircle(0, 0, 2.5);
+        this.tweens.add({
+          targets: s, scale: 1, alpha: 1, angle: 90, duration: 420, yoyo: true, hold: 200, ease: "Sine.easeOut",
+          onComplete: () => s.destroy(),
+        });
+      };
+      this.time.delayedCall(Phaser.Math.Between(200, 1800), () => {
+        spawn();
+        this.time.addEvent({ delay: Phaser.Math.Between(2000, 3000), loop: true, callback: spawn });
+      });
+    }
+
+    openRamenChoice() {
+      const name = GameState.playerName;
+      showChoice({
+        title: "🍜 김이 모락모락 나는 라면… 어떻게 할까?",
+        options: [
+          {
+            label: "🤝 이영현 부장님을 깨워서 함께 먹는다", style: "green",
+            onSelect: () => {
+              setQuest(null);
+              Inventory.remove("ramen_cooked");
+              Inventory.select(null);
+              GameState.flags.bossAwake = true;
+              GameState.flags.radioUnlocked = true;
+              this.scene.restart();
+              say(
+                narr("후루룩… 라면 냄새에 부장님이 번쩍 눈을 떴다!"),
+                line("이영현 부장", `${name}사원 고마워! 선장님이 요즘 AI공부를 하고 계신데, AI가 텍스트를 처리하는 기본 단위 이름을 비밀번호로 썼다고 했어!! 어서 무전기에 넣어봐!`)
+              );
+            },
+          },
+          {
+            label: "😋 식량이 없는데... 나 혼자 먹는다", style: "red",
+            onSelect: () => {
+              Inventory.remove("ramen_cooked");
+              Inventory.select(null);
+              GameState.busy = true;
+              GameState.endTime = Date.now();
+              say(narr("후루룩… 쩝쩝. 혼자 라면을 다 먹었지만... 더 이상 탈출할 방법을 찾지 못했다."));
+              this.cameras.main.fadeOut(2200, 20, 6, 8);
+              this.time.delayedCall(2400, () => showEnding({
+                type: "FAILED",
+                emoji: "💀🍜",
+                title: "퇴근 실패 (BAD END)",
+                message: "💀 퇴근하기 실패...\n혼자 라면을 다 먹었지만 섬을 탈출하지 못했습니다.",
+                solvedQuiz: false,
+              }));
+            },
+          },
+        ],
+      });
+    }
+  }
+
+  /* =====================================================================
+   *  10-① 클로즈업: 떡갈나무
+   * ===================================================================== */
+  class TreeScene extends CloseupScene {
+    constructor() { super("CLOSEUP_TREE", "🌳 떡갈나무"); }
+
+    drawScene() {
+      const g = this.add.graphics();
+      g.fillGradientStyle(0x1b4332, 0x1b4332, 0x2d6a4f, 0x2d6a4f, 1).fillRect(0, 0, GAME_W, VIEW_H);
+      g.fillStyle(0x2d6a4f, 1);
+      [[90, 60, 120], [300, 30, 140], [1000, 40, 150], [1200, 120, 110], [180, 220, 90], [1100, 260, 90]].forEach(([x, y, r]) => g.fillCircle(x, y, r));
+      g.fillStyle(0x40916c, 1);
+      [[60, 30, 60], [330, 10, 70], [980, 20, 80], [1220, 90, 50]].forEach(([x, y, r]) => g.fillCircle(x, y, r));
+      g.fillStyle(0xe9c46a, 1).fillRect(0, 470, GAME_W, 130);
+      g.fillStyle(0x000000, 0.18).fillEllipse(650, 478, 420, 40);
+      g.fillStyle(0x5b3a1e, 1).fillPoints([{ x: 530, y: 480 }, { x: 770, y: 480 }, { x: 722, y: 0 }, { x: 578, y: 0 }], true);
+      g.lineStyle(4, 0x3e2712, 0.7);
+      [600, 635, 670, 705].forEach((x, i) => {
+        const pts = [];
+        for (let y = 0; y <= 470; y += 30) pts.push({ x: x + Math.sin(y / 40 + i) * 6 + (y / 470) * (i - 1.5) * 12, y });
+        g.strokePoints(pts);
+      });
+      g.fillStyle(0x3e2712, 1).fillEllipse(640, 300, 34, 50);
+      g.fillStyle(0x5b3a1e, 1).fillTriangle(530, 480, 470, 490, 560, 440).fillTriangle(770, 480, 840, 492, 740, 440);
+
+      // 잔가지가 돋아난 줄기 마디 (가지를 꺾어도 부러진 그루터기가 남음)
+      this.TWIGS.forEach(({ at, tip }) => {
+        const [ax, ay] = at, len = Math.hypot(tip[0], tip[1]);
+        const sx = ax + (tip[0] / len) * 16, sy = ay + (tip[1] / len) * 16;
+        g.fillStyle(C.outline, 1).fillEllipse(ax, ay, 36, 30);
+        g.fillStyle(0x4a2f17, 1).fillEllipse(ax, ay, 30, 24);
+        g.fillStyle(0x6b4423, 1).fillEllipse(ax - 2, ay - 3, 20, 14);
+        K.stickOutline(g, ax, ay, sx, sy, 10);
+        K.stickFill(g, ax, ay, sx, sy, 10, 0x7a5232);
+        g.fillStyle(0xd9b48a, 1).fillCircle(sx, sy, 4);                  // 꺾인 단면
+      });
+
+      this.addHotspot({
+        name: "줄기", x: 650, y: 240, w: 190, h: 460,
+        onTap: () => say(GameState.flags.treeTwig1 && GameState.flags.treeTwig2
+          ? "잔가지를 다 꺾었다. 이제 더 얻을 건 없겠어."
+          : "수백 년은 된 것 같은 떡갈나무다. 줄기에 붙은 잔가지를 꺾을 수 있겠어."),
+      });
+
+      const twigMsg = () => (GameState.flags.treeTwig1 && GameState.flags.treeTwig2) ? "잔가지 두 개를 모두 꺾었다!" : "똑! 줄기에서 잔가지를 꺾었다.";
+      this.TWIGS.forEach((t) => this.addLoot({
+        flag: t.flag, item: "branch", x: t.at[0], y: t.at[1],
+        hit: { x: t.at[0] + t.tip[0] * 0.55, y: t.at[1] + t.tip[1] * 0.55, w: 130, h: 96 },
+        sprite: () => makeTwigSprite(this, t), onTake: () => say(twigMsg()),
+      }));
+    }
+
+    get TWIGS() {
+      return [
+        { flag: "treeTwig1", at: [576, 214], tip: [-110, -66], fork: [[-56, -34], [-68, -74]], leaves: [[-114, -70, -0.5], [-70, -78, -1.2], [-36, -32, 0.4]] },
+        { flag: "treeTwig2", at: [740, 338], tip: [110, -58], fork: [[56, -30], [74, -70]], leaves: [[114, -62, 0.4], [76, -74, 1.1], [38, -34, -0.3]] },
+      ];
+    }
+  }
+
+  /* =====================================================================
+   *  10-② 클로즈업: 돌무더기 (퇴근 시간 시계 퍼즐)
+   * ===================================================================== */
+  class RocksScene extends CloseupScene {
+    constructor() { super("CLOSEUP_ROCKS", "🪨 돌무더기"); }
+
+    drawScene() {
+      const F = GameState.flags;
+      const g = this.add.graphics();
+      g.fillGradientStyle(0x2b2420, 0x2b2420, 0x4a3f35, 0x4a3f35, 1).fillRect(0, 0, GAME_W, VIEW_H);
+      g.fillStyle(0x3d342c, 0.8);
+      [[120, 80, 180, 90], [520, 60, 220, 80], [1150, 90, 200, 120], [90, 330, 140, 100]].forEach(([x, y, w, h]) => g.fillEllipse(x, y, w, h));
+      g.fillStyle(0x6b5b4b, 1).fillRect(0, 468, GAME_W, 132);
+      g.fillStyle(0x57493c, 1);
+      for (let i = 0; i < 14; i++) g.fillCircle(Phaser.Math.Between(0, GAME_W), Phaser.Math.Between(480, 590), Phaser.Math.Between(6, 16));
+
+      g.fillStyle(0x1c1917, 0.35).fillEllipse(300, 200, 470, 170);
+      this.add.text(300, 196, "내가 제일 좋아하는 시간\n- 최재훈 다녀감", textStyle({
+        fontSize: "34px", fontStyle: "bold", color: "#d6d3d1", align: "center", lineSpacing: 16,
+      })).setOrigin(0.5).setAngle(-5).setAlpha(0.88);
+      this.addHotspot({
+        name: "숯 글씨", x: 300, y: 196, w: 450, h: 160, ignoreSelection: true,
+        onTap: () => {
+          GameState.flags.rocksNoteRead = true;
+          say("재훈부장님이 자주 간다는 낚시 장소가 여기구나! 그럼 제일 좋아하는 시간은... 퇴근시간?!");
+        },
+      });
+
+      this.cx = 845; this.cy = 268;
+      const R = 168;
+      g.lineStyle(6, 0x1c1917, 0.6).strokeCircle(this.cx, this.cy, R);
+      g.fillStyle(0x0c0a09, 1).fillEllipse(this.cx, this.cy, 120, 104);
+
+      this.pressed = new Set();
+      this.stones = [];
+      for (let n = 1; n <= 12; n++) {
+        const a = Phaser.Math.DegToRad(n * 30);
+        const x = this.cx + Math.sin(a) * R, y = this.cy - Math.cos(a) * R;
+        const sg = this.add.graphics().setPosition(x, y);
+        const label = this.add.text(x, y, String(n), textStyle({ fontSize: "28px", fontStyle: "bold", color: "#292524" })).setOrigin(0.5);
+        const s = { n, x, y, g: sg, label };
+        this.stones.push(s);
+        this.drawStone(s);
+        this.addHotspot({ name: `${n}번 돌`, x, y, w: 80, h: 80, flash: false, ignoreSelection: true, onTap: () => this.pressStone(s) });
+      }
+
+      if (!F.rocksSolved) {
+        this.center = this.add.container(this.cx, this.cy);
+        const cg = this.add.graphics();
+        cg.fillStyle(C.outline, 1).fillCircle(0, 0, 68);
+        cg.fillStyle(0x57534e, 1).fillCircle(0, 4, 62);
+        cg.fillStyle(0x78716c, 1).fillCircle(0, 0, 60);
+        cg.fillStyle(0xa8a29e, 1).fillEllipse(-18, -24, 40, 16);
+        cg.lineStyle(2, 0x44403c, 0.7).lineBetween(-30, -20, -6, 4).lineBetween(-6, 4, 10, -12).lineBetween(16, 18, 34, 30);
+        this.center.add(cg);
+        this.centerHotspot = this.addHotspot({
+          name: "가운데 돌", x: this.cx, y: this.cy, w: 120, h: 120, ignoreSelection: true,
+          onTap: () => say("가운데 큰 돌이 살짝 흔들린다. 주변 숫자 돌들과 연결된 장치 같은데…"),
+        });
+      } else {
+        this.showFish();
+      }
+
+      this.addLoot({ flag: "rocksBranch", item: "branch", x: 170, y: 430, angle: 8, w: 140, h: 80, msg: "돌 틈에 나뭇가지가 끼어 있었다." });
+    }
+
+    drawStone(s) {
+      const on = this.pressed.has(s.n) || (GameState.flags.rocksSolved && (s.n === 5 || s.n === 6));
+      s.g.clear();
+      if (on) s.g.fillStyle(0xfbbf24, 0.3).fillCircle(0, 0, 48);
+      s.g.fillStyle(C.outline, 1).fillCircle(0, 0, 38);
+      s.g.fillStyle(on ? 0xc2410c : 0x78716c, 1).fillCircle(0, 3, 34);
+      s.g.fillStyle(on ? 0xf59e0b : 0xa8a29e, 1).fillCircle(0, 0, 32);
+      s.g.fillStyle(on ? 0xfde68a : 0xd6d3d1, 1).fillEllipse(-10, -14, 26, 10);
+      s.label.setColor(on ? "#431407" : "#292524");
+    }
+
+    pressStone(s) {
+      if (GameState.flags.rocksSolved) { say("이미 풀린 장치다."); return; }
+      if (this.pressed.has(s.n)) this.pressed.delete(s.n);
+      else this.pressed.add(s.n);
+      this.drawStone(s);
+      this.tweens.add({ targets: [s.g, s.label], scale: 0.88, duration: 80, yoyo: true });
+
+      if (this.pressed.size < 2) return;
+      if (this.pressed.has(5) && this.pressed.has(6)) { this.solve(); return; }
+
+      GameState.busy = true;
+      this.time.delayedCall(350, () => {
+        this.tweens.add({ targets: this.center, x: this.cx + 8, duration: 50, yoyo: true, repeat: 3 });
+        say(narr("덜컹… 아무 일도 일어나지 않았다."));
+        this.pressed.clear();
+        this.stones.forEach((st) => this.drawStone(st));
+        GameState.busy = false;
+      });
+    }
+
+    solve() {
+      GameState.flags.rocksSolved = true;
+      GameState.busy = true;
+      this.stones.forEach((st) => this.drawStone(st));
+      if (this.centerHotspot) this.centerHotspot.zone.destroy();
+      this.time.delayedCall(300, () => {
+        this.cameras.main.shake(300, 0.008);
+        this.tweens.add({
+          targets: this.center, y: this.cy + 24, scale: 0.15, alpha: 0, duration: 700, ease: "Quad.easeIn",
+          onComplete: () => {
+            this.destroyDeep(this.center);
+            this.showFish();
+            GameState.busy = false;
+            say(narr("쿠웅…! 5시 30분, 가운데 돌이 아래로 쑥 꺼졌다!"), "구멍 안에서 뭔가 반짝이는데…?");
+          },
+        });
+      });
+    }
+
+    showFish() {
+      this.addLoot({
+        flag: "fishTaken", item: "fish_metal", x: this.cx, y: this.cy, w: 130, h: 110, size: 84,
+        msg: "물고기 모양 쇳덩어리다. 어딘가에 끼우는 열쇠 같은데?",
+      });
+    }
+  }
+
+  /* =====================================================================
+   *  10-③ 클로즈업: 배낭 (필요한 물건 4종 + 더미 3종)
+   * ===================================================================== */
+  class BagScene extends CloseupScene {
+    constructor() { super("CLOSEUP_BAG", "🎒 배낭"); }
+
+    drawScene() {
+      const g = this.add.graphics();
+      g.fillGradientStyle(0xf4d58d, 0xf4d58d, 0xe9c46a, 0xe9c46a, 1).fillRect(0, 0, GAME_W, VIEW_H);
+      g.fillStyle(0xc9a050, 0.5);
+      for (let i = 0; i < 120; i++) g.fillCircle(Phaser.Math.Between(0, GAME_W), Phaser.Math.Between(0, VIEW_H), Phaser.Math.Between(1, 3));
+      this.layerObjs = [];
+      this.renderBag();
+    }
+
+    renderBag() {
+      this.layerObjs.forEach((o) => o.destroy());
+      this.layerObjs = [];
+      const keep = (o) => { this.layerObjs.push(o); return o; };
+      const g = keep(this.add.graphics());
+
+      if (!GameState.flags.bagOpen) {
+        g.fillStyle(0x000000, 0.18).fillEllipse(640, 478, 400, 40);
+        g.fillStyle(C.outline, 1).fillRoundedRect(464, 144, 352, 332, 52);
+        g.fillStyle(0x4d7c0f, 1).fillRoundedRect(470, 150, 340, 320, 48);
+        g.fillStyle(0x3f6212, 1).fillRoundedRect(470, 380, 340, 90, { tl: 0, tr: 0, bl: 48, br: 48 });
+        g.fillStyle(C.outline, 1).fillRoundedRect(414, 294, 72, 142, 22).fillRoundedRect(794, 294, 72, 142, 22);
+        g.fillStyle(0x3f6212, 1).fillRoundedRect(420, 300, 60, 130, 18).fillRoundedRect(800, 300, 60, 130, 18);
+        g.fillStyle(C.outline, 1).fillRoundedRect(474, 130, 332, 152, 46);
+        g.fillStyle(0x3f6212, 1).fillRoundedRect(480, 136, 320, 140, 42);
+        g.fillStyle(0x65a30d, 1).fillRoundedRect(500, 144, 280, 14, 7);
+        g.lineStyle(3, 0x86a34a, 0.8);
+        for (let x = 500; x < 790; x += 16) g.lineBetween(x, 266, x + 8, 266);
+        g.lineStyle(10, 0x365314).lineBetween(540, 270, 532, 460).lineBetween(740, 270, 748, 460);
+        keep(this.add.text(640, 194, "재후니꺼", textStyle({ fontSize: "42px", fontStyle: "bold", color: "#f8fafc", stroke: "#1a2e05", strokeThickness: 5 })).setOrigin(0.5).setAngle(-6));
+
+        g.lineStyle(14, C.outline).beginPath().arc(640, 262, 26, Math.PI, 0).strokePath();
+        g.lineStyle(8, 0xb8860b).beginPath().arc(640, 262, 26, Math.PI, 0).strokePath();
+        g.fillStyle(C.outline, 1).fillRoundedRect(580, 253, 120, 96, 15);
+        g.fillStyle(0xb8860b, 1).fillRoundedRect(585, 258, 110, 86, 12);
+        g.fillStyle(0xe8b923, 1).fillRoundedRect(585, 258, 110, 76, 12);
+        g.fillStyle(0xfde68a, 1).fillRoundedRect(593, 263, 94, 10, 5);
+        g.fillStyle(0x6b5207, 1).fillEllipse(632, 301, 58, 26).fillTriangle(656, 301, 676, 286, 676, 316);
+        g.fillStyle(0xe8b923, 1).fillCircle(614, 297, 3);
+
+        keep(this.addHotspot({
+          name: "배낭", x: 640, y: 400, w: 360, h: 140,
+          onTap: () => say("최재훈 부장님 배낭이다. '재후니꺼'라니… 귀여우시네."),
+        }).zone);
+        keep(this.addHotspot({
+          name: "자물쇠", x: 640, y: 296, w: 150, h: 120,
+          onTap: () => say("물고기 모양 홈이 파인 자물쇠다. 같은 모양의 무언가를 끼워야 열릴 것 같다."),
+          onUse: (itemId) => {
+            if (itemId !== "fish_metal") return false;
+            this.unlock();
+            return true;
+          },
+        }).zone);
+      } else {
+        // ── 지퍼가 활짝 열린 배낭: 뒤판 → 어두운 안감(깊이) → 내용물 → 앞판(입구 테두리) 순서로 겹침 ──
+        const X = 640;
+        g.fillStyle(0x000000, 0.2).fillEllipse(X, 566, 620, 46);
+        g.lineStyle(24, C.outline).beginPath().arc(X, 130, 74, Math.PI, 0).strokePath();      // 손잡이
+        g.lineStyle(15, 0x3f6212).beginPath().arc(X, 130, 74, Math.PI, 0).strokePath();
+        g.fillStyle(C.outline, 1).fillRoundedRect(368, 110, 544, 454, 72);                     // 뒤판
+        g.fillStyle(0x4d7c0f, 1).fillRoundedRect(374, 116, 532, 442, 68);
+        g.fillStyle(0x65a30d, 1).fillRoundedRect(410, 124, 460, 14, 7);
+        g.fillStyle(C.outline, 1).fillRoundedRect(330, 300, 56, 170, 20).fillRoundedRect(894, 300, 56, 170, 20);   // 옆 주머니
+        g.fillStyle(0x3f6212, 1).fillRoundedRect(335, 305, 46, 160, 16).fillRoundedRect(899, 305, 46, 160, 16);
+
+        // 입구 안쪽: 위는 빛을 받은 안감, 아래로 갈수록 깊고 어두움
+        g.fillStyle(C.outline, 1).fillRoundedRect(400, 152, 480, 340, 62);
+        g.fillStyle(0x3d4d24, 1).fillRoundedRect(406, 158, 468, 328, 58);
+        g.fillStyle(0x2c3a1a, 1).fillRoundedRect(416, 192, 448, 290, 54);
+        g.fillStyle(0x1e2912, 1).fillEllipse(X, 372, 420, 210);
+        g.fillStyle(0x131b0b, 1).fillEllipse(X, 412, 320, 120);
+        g.lineStyle(2, 0x5a6d3a, 0.75);
+        for (let x = 440; x < 842; x += 14) g.lineBetween(x, 178, x + 7, 178);                 // 안감 박음질
+        g.fillStyle(0x4a5c2c, 1).fillRoundedRect(440, 196, 140, 10, 5);                        // 안쪽 칸막이 고무줄
+        // 지퍼 (입구 위·옆 테두리)
+        g.lineStyle(12, C.outline, 1).strokeRoundedRect(400, 152, 480, 340, 62);
+        g.lineStyle(7, 0x9ca3af, 1).strokeRoundedRect(400, 152, 480, 340, 62);
+        for (let x = 468; x <= 812; x += 9) {
+          g.fillStyle(x % 18 ? 0xe5e7eb : 0x6b7280, 1).fillRect(x, 148, 5, 8);
+        }
+        for (let y = 216; y <= 430; y += 9) {
+          g.fillStyle(y % 18 ? 0xe5e7eb : 0x6b7280, 1).fillRect(396, y, 8, 5).fillRect(876, y, 8, 5);
+        }
+        g.fillStyle(C.outline, 1).fillRoundedRect(880, 196, 24, 48, 7);                        // 지퍼 손잡이
+        g.fillStyle(0xd1d5db, 1).fillRoundedRect(883, 199, 18, 42, 6);
+        g.fillStyle(0x6b7280, 1).fillRoundedRect(887, 226, 10, 10, 3);
+
+        // 앞판: 가운데가 살짝 처진 입구 테두리가 물건 아래쪽을 덮어 "파묻힌" 느낌
+        const front = keep(this.add.graphics().setDepth(13));
+        const lip = [];
+        for (let i = 0; i <= 28; i++) { const t = i / 28; lip.push({ x: 388 + t * 504, y: 454 + Math.sin(t * Math.PI) * 16 }); }
+        const body = [...lip, { x: 892, y: 524 }, { x: 874, y: 556 }, { x: 840, y: 566 }, { x: 440, y: 566 }, { x: 406, y: 556 }, { x: 388, y: 524 }];
+        front.fillStyle(0x4d7c0f, 1).fillPoints(body, true);
+        front.fillStyle(0x3f6212, 1).fillRoundedRect(392, 520, 496, 44, { tl: 0, tr: 0, bl: 34, br: 34 });
+        front.lineStyle(5, 0x7fb043, 1).strokePoints(lip.map((p) => ({ x: p.x, y: p.y + 7 })));
+        front.lineStyle(6, C.outline, 1).strokePoints(body, true, true);
+        front.lineStyle(7, 0x9ca3af, 1).strokePoints(lip);
+        lip.forEach((p, i) => { if (i % 2 === 0 && i > 1 && i < 27) front.fillStyle(0xe5e7eb, 1).fillRect(p.x - 2, p.y - 4, 5, 8); });
+        front.fillStyle(C.outline, 1).fillRoundedRect(514, 488, 252, 66, 16);                 // 앞주머니
+        front.fillStyle(0x3f6212, 1).fillRoundedRect(519, 493, 242, 56, 13);
+        front.lineStyle(3, 0x86a34a, 0.9);
+        for (let x = 530; x < 752; x += 14) front.lineBetween(x, 500, x + 7, 500);
+        front.lineStyle(10, 0x365314).lineBetween(470, 474, 462, 560).lineBetween(810, 474, 818, 560);
+        front.fillStyle(C.outline, 1).fillRoundedRect(744, 506, 34, 30, 6);                    // 풀린 물고기 자물쇠
+        front.fillStyle(0xe8b923, 1).fillRoundedRect(747, 509, 28, 24, 5);
+        front.fillStyle(0x6b5207, 1).fillEllipse(759, 521, 16, 8);
+        keep(this.add.text(632, 521, "재후니꺼", textStyle({ fontSize: "24px", fontStyle: "bold", color: "#f8fafc", stroke: "#1a2e05", strokeThickness: 4 })).setOrigin(0.5).setAngle(-4).setDepth(14));
+
+        keep(this.addHotspot({
+          name: "배낭", x: X, y: 524, w: 500, h: 76,
+          onTap: () => {
+            const left = ["magazine", "lighter", "ramen_raw", "recipe"].filter((id) => !GameState.flags["bag_" + id]);
+            say(left.length ? "배낭 안에 이것저것 뒤엉켜 있다. 뒤적여서 필요한 것만 챙기자." : "쓸 만한 건 다 챙겼다. 재훈부장님 감사합니다…");
+          },
+        }).zone);
+
+        // 내용물: 필요한 물건 4종 + 더미 3종이 비스듬히 겹쳐 파묻혀 있음 (라벨 없음)
+        const useless = "지금은 필요 없는 물건이다.";
+        // 큰 옷이 바닥에 깔리고 그 위로 물건들이 비스듬히 겹쳐 쌓임. 아래쪽 물건은 앞판에 반쯤 가려짐
+        this.addDummy({ tex: "obj_shirt", x: 604, y: 302, size: 156, angle: -16, depth: 8, msg: useless });
+        this.addDummy({ tex: "obj_sock", x: 814, y: 434, size: 92, angle: 34, depth: 9, msg: useless });
+        const LOOT = [
+          ["magazine", 498, 350, 114, -26, 10, "월간 피싱 잡지다. 표지 모델이… 재훈부장님?!"],
+          ["ramen_raw", 768, 318, 112, 16, 10, "봉지 라면이다! 이걸로 허기를 달랠 수 있겠어."],
+          ["recipe", 574, 434, 100, -12, 10, "레시피 메모다. 인벤토리에서 선택하면 읽을 수 있다."],
+          ["lighter", 668, 356, 76, 30, 12, "라이터다! 불을 피울 수 있겠어."],
+        ];
+        LOOT.forEach(([id, x, y, size, angle, depth, msg]) => this.addLoot({
+          flag: "bag_" + id, item: id, x, y, size, angle, depth, plain: true, w: size * 0.7, h: size * 0.7, msg,
+        }));
+        this.addDummy({ tex: "obj_bottle", x: 708, y: 424, size: 106, angle: 70, depth: 11, msg: useless });
+      }
+    }
+
+    unlock() {
+      Inventory.remove("fish_metal");
+      Inventory.select(null);
+      GameState.flags.bagOpen = true;
+      this.cameras.main.flash(250, 255, 240, 180);
+      this.renderBag();
+      say(narr("찰칵! 물고기 쇳덩어리가 홈에 꼭 맞았다."), "배낭이 열렸다! 안에 뭐가 들었나…");
+    }
+  }
+
+  /* =====================================================================
+   *  10-④ 클로즈업: 작은 폭포
+   * ===================================================================== */
+  class WaterfallScene extends CloseupScene {
+    constructor() { super("CLOSEUP_WATERFALL", "💦 작은 폭포"); }
+
+    drawScene() {
+      const g = this.add.graphics();
+      g.fillStyle(0x6b5b4b, 1).fillRect(0, 0, GAME_W, VIEW_H);
+      g.fillStyle(0x57493c, 1).fillPoints([{ x: 0, y: 0 }, { x: 520, y: 0 }, { x: 540, y: 380 }, { x: 0, y: 420 }], true);
+      g.fillStyle(0x57493c, 1).fillPoints([{ x: 760, y: 0 }, { x: GAME_W, y: 0 }, { x: GAME_W, y: 420 }, { x: 740, y: 380 }], true);
+      g.fillStyle(0x52734d, 1).fillEllipse(420, 120, 120, 40).fillEllipse(860, 90, 140, 44).fillEllipse(1100, 260, 120, 40).fillEllipse(180, 260, 100, 36);
+      g.fillStyle(0x7c6a58, 1).fillRect(0, 400, GAME_W, 200);
+      g.fillStyle(0x0e7490, 1).fillEllipse(640, 468, 720, 160);
+      g.fillStyle(0x4cc9f0, 1).fillEllipse(640, 462, 680, 140);
+      g.fillStyle(0x9be7ff, 0.95).fillRect(560, 0, 160, 440);
+      g.fillStyle(0xe0f7ff, 0.7).fillRect(575, 0, 18, 440).fillRect(680, 0, 12, 440);
+
+      for (let i = 0; i < 16; i++) {
+        const s = this.add.rectangle(Phaser.Math.Between(568, 712), -20, 5, Phaser.Math.Between(30, 60), 0xffffff, 0.8);
+        this.tweens.add({ targets: s, y: 440, duration: Phaser.Math.Between(700, 1000), delay: i * 90, repeat: -1 });
+      }
+      for (let i = 0; i < 5; i++) {
+        const m = this.add.ellipse(560 + i * 40, 440, 90, 36, 0xffffff, 0.5);
+        this.tweens.add({ targets: m, scaleX: 1.4, alpha: 0.15, duration: 800 + i * 120, yoyo: true, repeat: -1 });
+      }
+
+      this.addHotspot({
+        name: "폭포 줄기", x: 640, y: 230, w: 220, h: 420,
+        onTap: () => say(Inventory.has("pot_water")
+          ? "냄비에 물은 이미 가득하다."
+          : "물이 정말 맑고 시원하다. 담아 갈 그릇이 있으면 좋겠는데…"),
+        onUse: (itemId) => {
+          if (itemId === "pot_empty") {
+            Inventory.replace("pot_empty", "pot_water");
+            Inventory.select(null);
+            this.splash();
+            toast("✨ 물 찬 냄비 획득!");
+            say("깨끗한 물을 냄비에 가득 담았다!");
+            return true;
+          }
+          if (itemId === "pot_water") { say("이미 물을 가득 담았다."); return true; }
+          return false;
+        },
+      });
+
+      [["waterBranch1", 236, 452, 14, "젖은 바위 틈에 끼어 있던 나뭇가지다. 물기만 털면 쓸 만하겠어."],
+       ["waterBranch2", 1044, 458, -12, "이끼 낀 돌 사이에 걸린 나뭇가지를 빼냈다."]].forEach(([flag, x, y, angle, msg]) => {
+        nestBranch(this, x, y, angle, "wet");
+        this.addLoot({ flag, item: "branch", x, y, angle, w: 140, h: 80, sprite: () => makeBranchSprite(this, false, true), msg });
+      });
+    }
+
+    splash() {
+      for (let i = 0; i < 12; i++) {
+        const d = this.add.circle(640, 300, Phaser.Math.Between(4, 9), 0xe0f7ff, 0.9);
+        this.tweens.add({
+          targets: d, x: 640 + Phaser.Math.Between(-140, 140), y: 300 + Phaser.Math.Between(-120, 40), alpha: 0,
+          duration: 600, ease: "Quad.easeOut", onComplete: () => d.destroy(),
+        });
+      }
+    }
+  }
+
+  /* =====================================================================
+   *  10-⑤ 클로즈업: 물건더미 & 화로 (5단계 조리 FSM + 더미 5종)
+   * ===================================================================== */
+  const BRAZIER_FSM = [
+    { need: "branch",    icon: "🪵" },
+    { need: "magazine",  icon: "📖" },
+    { need: "lighter",   icon: "🔥" },
+    { need: "pot_water", icon: "💧" },
+    { need: "ramen_raw", icon: "🍜" },
+  ];
+  const BRAZIER_DESC = [
+    "텅 빈 화로다. 불을 피우려면 땔감이 넉넉히 필요하겠다.",
+    "장작을 쌓았다. 불이 잘 붙게 할 불쏘시개가 필요하다.",
+    "불쏘시개도 넣었다. 이제 불만 붙이면 된다.",
+    "불이 활활 타오른다! 물 끓일 냄비를 올리자.",
+    "물이 보글보글 끓고 있다. 라면을 넣을 차례!",
+    "맛있는 냄새가 아직 남아 있다…",
+  ];
+
+  class JunkScene extends CloseupScene {
+    constructor() { super("CLOSEUP_JUNK", "🔥 물건더미 & 화로"); }
+
+    drawScene() {
+      const g = this.add.graphics();
+      g.fillGradientStyle(0xf4a261, 0xf4a261, 0xe9c46a, 0xe9c46a, 1).fillRect(0, 0, GAME_W, 300);
+      g.fillStyle(0xe9c46a, 1).fillRect(0, 300, GAME_W, 300);
+      g.fillStyle(0xd4a94f, 0.6).fillRect(0, 300, GAME_W, 8);
+      g.fillStyle(0xc9a050, 0.5);
+      for (let i = 0; i < 60; i++) g.fillCircle(Phaser.Math.Between(0, GAME_W), Phaser.Math.Between(310, VIEW_H), Phaser.Math.Between(1, 3));
+
+      // 나무 상자 (외곽선 + 음영)
+      g.fillStyle(0x000000, 0.15).fillEllipse(300, 440, 460, 40);
+      const crate = (x, y, w, h, base, x2) => {
+        g.fillStyle(C.outline, 1).fillRect(x - 4, y - 4, w + 8, h + 8);
+        g.fillStyle(base, 1).fillRect(x, y, w, h);
+        g.fillStyle(0x6b4423, 1).fillRect(x, y + h - 12, w, 12);
+        g.fillStyle(0xd4a373, 1).fillRect(x + 4, y + 4, w - 8, 6);
+        g.lineStyle(4, 0x6b4423).strokeRect(x + 10, y + 10, w - 20, h - 24);
+        if (x2) g.lineBetween(x + 10, y + 10, x + w - 10, y + h - 14);
+      };
+      crate(100, 250, 210, 180, 0xa47148, true);
+      crate(300, 320, 170, 110, 0xb5835a, false);
+      crate(140, 180, 130, 70, 0x8b5e3c, false);
+
+      this.addHotspot({
+        name: "물건더미", x: 290, y: 330, w: 420, h: 180, flash: false,
+        onTap: () => say("떠밀려 온 상자들이다. 잡동사니 중에서 쓸 만한 물건만 골라 챙기자."),
+      });
+
+      // ── 더미 오브젝트 (낚싯대 · 빈병 · 비닐봉지 · 조개껍데기 · 꽃게) ──
+      const trash = "쓸모없는 쓰레기다.";
+      this.addDummy({ tex: "obj_rod", x: 50, y: 300, size: 170, angle: -6, msg: trash });
+      this.addDummy({ tex: "obj_bottle", x: 518, y: 398, size: 74, angle: -14, msg: trash });
+      this.addDummy({ tex: "obj_plastic", x: 610, y: 340, size: 82, angle: 6, msg: trash });
+      this.addDummy({ tex: "obj_shell", x: 664, y: 410, size: 56, angle: -10, msg: trash });
+      this.createCrab();
+
+      // ── 루팅: 빈 냄비, 수저세트, 나뭇가지 3개 ──
+      this.addLoot({ flag: "junkPot", item: "pot_empty", x: 205, y: 140, w: 120, h: 100, size: 76, msg: "찌그러졌지만 쓸 만한 냄비다. 물을 담을 수 있겠어." });
+      this.addLoot({ flag: "junkCutlery", item: "cutlery", x: 385, y: 278, w: 110, h: 90, size: 64, msg: "수저세트다. 뭔가 먹을 일이 생기면 좋겠는데." });
+      [[120, 470, 6], [270, 482, -10], [420, 468, 14]].forEach(([x, y, a], i) =>
+        this.addLoot({ flag: `junkBranch${i + 1}`, item: "branch", x, y, angle: a, w: 130, h: 70, msg: "상자 아래에 나뭇가지가 있었다." }));
+
+      // 화로
+      this.X = 880;
+      this.addHotspot({
+        name: "화로", x: this.X, y: 300, w: 380, h: 320,
+        onTap: () => say(BRAZIER_DESC[GameState.flags.brazierStep || 0]),
+        onUse: (itemId) => this.useOnBrazier(itemId),
+      });
+      this.renderBrazier();
+    }
+
+    /** 좌우로 오가는 꽃게 — 터치하면 후다닥 도망갔다가 돌아옴 */
+    createCrab() {
+      const crab = this.addDummy({
+        tex: "obj_crab", x: 548, y: 466, size: 70,
+        onTap: () => {
+          if (crab.fleeing) return;
+          crab.fleeing = true;
+          this.patrol.pause();
+          say("꽃게가 집게발을 흔들며 도망간다!");
+          const home = { x: crab.x, y: crab.y };
+          this.tweens.chain({
+            targets: crab,
+            tweens: [
+              { angle: 12, duration: 60, yoyo: true, repeat: 2 },
+              { x: home.x + 150, y: home.y - 10, duration: 260, ease: "Quad.easeOut" },
+              { x: home.x, y: home.y, duration: 900, delay: 900, ease: "Sine.easeInOut" },
+            ],
+            onComplete: () => { crab.fleeing = false; crab.setAngle(0); this.patrol.resume(); },
+          });
+        },
+      });
+      crab.fleeing = false;
+      this.patrol = this.tweens.add({
+        targets: crab, x: 652, duration: 2000, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+        onYoyo: () => crab.setFlipX(true), onRepeat: () => crab.setFlipX(false),
+      });
+      this.tweens.add({ targets: crab, scaleY: crab.scaleY * 0.92, duration: 160, yoyo: true, repeat: -1 });
+    }
+
+    useOnBrazier(itemId) {
+      const F = GameState.flags;
+      const step = F.brazierStep || 0;
+      if (step >= 5) { say("라면은 이미 다 끓였다."); return true; }
+
+      const expected = BRAZIER_FSM[step].need;
+      if (itemId !== expected) { say("지금은 할 수 없다."); return true; }
+
+      switch (step) {
+        case 0: {
+          const n = Inventory.count("branch");
+          if (n < ITEMS.branch.max) { say(`나뭇가지가 아직 부족하다. (${n}/${ITEMS.branch.max})`); return true; }
+          Inventory.remove("branch", ITEMS.branch.max);
+          F.brazierStep = 1;
+          say(narr("나뭇가지 10개를 화로에 차곡차곡 쌓았다."));
+          break;
+        }
+        case 1:
+          Inventory.remove("magazine");
+          F.brazierStep = 2;
+          say("월간 피싱 잡지를 찢어 불쏘시개로 넣었다. 재훈부장님 죄송해요…");
+          break;
+        case 2:
+          F.brazierStep = 3;
+          this.cameras.main.flash(300, 255, 180, 80);
+          toast("🔥 불이 붙었다!");
+          say(narr("화르륵! 잡지에 붙은 불이 장작으로 옮겨붙었다!"));
+          break;
+        case 3:
+          Inventory.remove("pot_water");
+          F.brazierStep = 4;
+          say(narr("물 찬 냄비를 화로에 걸었다. 금세 보글보글 끓기 시작한다."));
+          break;
+        case 4:
+          Inventory.remove("ramen_raw");
+          Inventory.select(null);
+          this.cookRamen();
+          return true;
+      }
+      Inventory.select(null);
+      this.renderBrazier();
+      return true;
+    }
+
+    cookRamen() {
+      GameState.busy = true;
+      const bowl = this.add.image(this.X, 230, "icon_ramen_cooked").setDisplaySize(96, 96).setDepth(20).setScale(0.2).setAlpha(0);
+      this.tweens.add({ targets: bowl, scale: 0.75, alpha: 1, y: 160, duration: 700, ease: "Back.easeOut" });
+      say(narr("봉지를 뜯어 면과 스프를 넣었다. 보글보글… 면이 익어간다…"));
+      this.time.delayedCall(1900, () => {
+        this.tweens.add({ targets: bowl, alpha: 0, y: 130, duration: 300, onComplete: () => bowl.destroy() });
+        GameState.flags.brazierStep = 5;
+        this.renderBrazier();
+        Inventory.add("ramen_cooked");
+        toast("🍜 완성된 라면 획득!");
+        say("김이 모락모락 나는 라면이 완성됐다! 냄새가 정말 기가 막히네... 쓰러져 계신 이영현 부장님께 가져가 볼까?");
+        setQuest("📌 부장님께 라면 가져가기");
+        GameState.busy = false;
+      });
+    }
+
+    renderBrazier() {
+      const st = GameState.flags.brazierStep || 0;
+      const X = this.X;
+      if (this.brz) this.destroyDeep(this.brz);
+      (this.brzEvents || []).forEach((e) => e.remove());
+      this.brzEvents = [];
+
+      const Cn = (this.brz = this.add.container(0, 0).setDepth(2));
+      const g = this.add.graphics();
+      Cn.add(g);
+      g.fillStyle(0x000000, 0.2).fillEllipse(X, 448, 380, 60);
+      g.fillStyle(0x1c1917, 1).fillEllipse(X, 420, 270, 74);
+      g.fillStyle(0x0c0a09, 1).fillCircle(X - 50, 422, 6).fillCircle(X + 30, 428, 5);
+
+      if (st >= 1) {
+        g.lineStyle(22, C.outline).lineBetween(X - 110, 424, X + 90, 398).lineBetween(X - 90, 398, X + 110, 424);
+        g.lineStyle(16, 0x7a4a24).lineBetween(X - 110, 424, X + 90, 398).lineBetween(X - 90, 398, X + 110, 424);
+        g.lineStyle(14, 0x8b5a2b).lineBetween(X - 70, 412, X + 70, 404);
+        g.fillStyle(0xd4a373, 1).fillCircle(X - 110, 424, 7).fillCircle(X + 110, 424, 7).fillCircle(X + 90, 398, 7).fillCircle(X - 90, 398, 7);
+      }
+      if (st >= 2 && st < 4) {
+        g.fillStyle(0xf1f5f9, 1).fillTriangle(X - 40, 402, X - 6, 374, X + 10, 404);
+        g.fillStyle(0xbfdbfe, 1).fillTriangle(X, 400, X + 30, 372, X + 46, 402);
+        g.fillStyle(0xfef3c7, 1).fillTriangle(X - 26, 404, X + 4, 384, X + 26, 406);
+      }
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        const x = X + Math.cos(a) * 142, y = 420 + Math.sin(a) * 40;
+        g.fillStyle(C.outline, 1).fillCircle(x, y, 19);
+        g.fillStyle(0x78716c, 1).fillCircle(x, y + 2, 16);
+        g.fillStyle(0xa8a29e, 1).fillCircle(x, y, 15);
+        g.fillStyle(0xd6d3d1, 1).fillCircle(x - 5, y - 5, 4);
+      }
+      g.lineStyle(12, C.outline).lineBetween(X - 150, 446, X, 150).lineBetween(X + 150, 446, X, 150);
+      g.lineStyle(7, 0x8b5a2b).lineBetween(X - 150, 446, X, 150).lineBetween(X + 150, 446, X, 150);
+      g.lineStyle(3, 0x374151).lineBetween(X, 150, X, 205);
+
+      if (st >= 3) {
+        [[-50, 0xf97316, 60, 100], [50, 0xf97316, 60, 96], [0, 0xf97316, 80, 130], [-20, 0xfbbf24, 44, 80], [24, 0xfbbf24, 40, 74], [0, 0xfff7ae, 24, 46]]
+          .forEach(([dx, col, w, h], i) => {
+            const f = this.add.ellipse(X + dx, 418, w, h, col, 0.95).setOrigin(0.5, 1);
+            Cn.add(f);
+            this.tweens.add({ targets: f, scaleY: { from: 0.85, to: 1.15 }, scaleX: { from: 1.05, to: 0.95 }, duration: 180 + i * 30, yoyo: true, repeat: -1 });
+          });
+        this.brzEvents.push(this.time.addEvent({
+          delay: 260, loop: true, callback: () => {
+            const e = this.add.circle(X + Phaser.Math.Between(-60, 60), 380, Phaser.Math.Between(2, 4), 0xffb347).setDepth(3);
+            this.tweens.add({ targets: e, y: 250, x: e.x + Phaser.Math.Between(-30, 30), alpha: 0, duration: 1100, onComplete: () => e.destroy() });
+          },
+        }));
+      }
+
+      if (st >= 4) {
+        const pot = this.add.image(X, 262, st === 4 ? "icon_pot_water" : "icon_pot_empty").setDisplaySize(170, 170);
+        Cn.add(pot);
+        this.brzEvents.push(this.time.addEvent({
+          delay: 420, loop: true, callback: () => {
+            const s = this.add.ellipse(X + Phaser.Math.Between(-50, 50), 214, 40, 26, 0xffffff, 0.4).setDepth(3);
+            this.tweens.add({ targets: s, y: 120, scale: 1.8, alpha: 0, duration: 1500, onComplete: () => s.destroy() });
+          },
+        }));
+        if (st === 4) {
+          this.brzEvents.push(this.time.addEvent({
+            delay: 200, loop: true, callback: () => {
+              const b = this.add.circle(X + Phaser.Math.Between(-50, 50), 230, Phaser.Math.Between(3, 7)).setStrokeStyle(2, 0xffffff, 0.9).setDepth(3);
+              this.tweens.add({ targets: b, y: 214, scale: 1.4, alpha: 0, duration: 450, onComplete: () => b.destroy() });
+            },
+          }));
+          const bubbleTxt = this.add.text(X + 130, 196, "보글보글", textStyle({ fontSize: "20px", fontStyle: "bold", color: "#e0f2fe", stroke: "#0c4a6e", strokeThickness: 4 })).setOrigin(0.5);
+          Cn.add(bubbleTxt);
+          this.tweens.add({ targets: bubbleTxt, y: 181, alpha: 0.4, duration: 600, yoyo: true, repeat: -1 });
+        }
+      }
+
+      const pg = this.add.graphics();
+      drawWood(pg, X - 175, 92, 350, 40, 10);
+      const prog = this.add.text(X, 110, BRAZIER_FSM.map((s, i) => (i < st ? s.icon : "❔")).join("  →  "),
+        { fontFamily: EMOJI_FONT, fontSize: "20px", resolution: TEXT_RES, color: C.cream }).setOrigin(0.5);
+      Cn.add([pg, prog]);
+    }
+  }
+
+  /* =====================================================================
+   *  10-⑥ 클로즈업: 난파선 통통배
+   * ===================================================================== */
+  class BoatScene extends CloseupScene {
+    constructor() { super("CLOSEUP_BOAT", "🚤 난파선 조타실"); }
+
+    drawScene() {
+      const unlocked = !!GameState.flags.radioUnlocked;
+      const g = this.add.graphics();
+      g.fillStyle(0x7c4a2d, 1).fillRect(0, 0, GAME_W, VIEW_H);
+      g.lineStyle(2, 0x5b3520, 0.8);
+      for (let y = 30; y < 330; y += 36) g.lineBetween(0, y, GAME_W, y);
+      g.fillStyle(C.outline, 1).fillRoundedRect(174, 42, 932, 212, 18);
+      g.fillStyle(0x0f172a, 1).fillRoundedRect(180, 48, 920, 200, 16);
+      g.fillGradientStyle(0x1e2a5a, 0x1e2a5a, 0xf4a261, 0xf4a261, 1).fillRect(196, 64, 888, 104);
+      g.fillStyle(0x1d6f8a, 1).fillRect(196, 168, 888, 64);
+      g.fillStyle(0xffd27a, 1).fillCircle(820, 170, 30);
+      g.lineStyle(2, 0xffffff, 0.5).lineBetween(300, 70, 360, 160).lineBetween(360, 160, 340, 220).lineBetween(360, 160, 420, 190);
+      g.fillStyle(0xa8743f, 1).fillRect(0, 316, GAME_W, 20);
+      g.fillStyle(0x5b3a1e, 1).fillRect(0, 336, GAME_W, 264);
+      g.lineStyle(20, C.outline).strokeCircle(300, 430, 92);
+      g.lineStyle(14, 0x6b4423).strokeCircle(300, 430, 92);
+      g.lineStyle(8, 0x6b4423);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        g.lineBetween(300, 430, 300 + Math.cos(a) * 112, 430 + Math.sin(a) * 112);
+      }
+      g.fillStyle(C.outline, 1).fillCircle(300, 430, 26);
+      g.fillStyle(0xa47148, 1).fillCircle(300, 430, 21);
+
+      g.fillStyle(C.outline, 1).fillRoundedRect(634, 244, 342, 202, 22);
+      g.fillStyle(0x1f2937, 1).fillRoundedRect(640, 250, 330, 190, 18);
+      g.fillStyle(0x374151, 1).fillRoundedRect(640, 250, 330, 178, 18);
+      g.fillStyle(0x4b5563, 1).fillRoundedRect(650, 255, 310, 10, 5);
+      g.fillStyle(C.outline, 1).fillRect(664, 270, 198, 70);
+      g.fillStyle(0x052e16, 1).fillRect(668, 274, 190, 62);
+      g.fillStyle(0x9ca3af, 1).fillCircle(910, 300, 18).fillCircle(910, 360, 14);
+      g.lineStyle(3, 0x4b5563).lineBetween(910, 300, 920, 288);
+      g.lineStyle(3, 0x1f2937, 1);
+      for (let y = 360; y <= 420; y += 10) g.lineBetween(672, y, 860, y);
+      g.lineStyle(4, 0x6b7280).lineBetween(950, 252, 960, 200).lineBetween(960, 200, 992, 190);
+      g.lineStyle(3, 0x111827).beginPath().moveTo(650, 420).lineTo(610, 470).lineTo(590, 440).strokePath();
+      g.fillStyle(0x1f2937, 1).fillRoundedRect(566, 410, 44, 62, 12);
+      if (!unlocked) g.lineStyle(2, 0xd1d5db, 0.7).lineBetween(700, 280, 740, 330).lineBetween(740, 330, 760, 300);
+
+      const quizDone = !!GameState.flags.quizSolved;
+      const lcd = this.add.text(763, 305, quizDone ? "SIGNAL…" : unlocked ? "PASSWORD?" : "NO SIGNAL", {
+        fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontSize: "26px", fontStyle: "bold",
+        color: quizDone ? "#fbbf24" : unlocked ? "#4ade80" : "#ef4444", resolution: TEXT_RES,
+      }).setOrigin(0.5);
+      this.tweens.add({ targets: lcd, alpha: 0.25, duration: unlocked ? 500 : 900, yoyo: true, repeat: -1 });
+
+      if (!unlocked) {
+        this.time.addEvent({
+          delay: 1300, loop: true, callback: () => {
+            const s = this.add.text(Phaser.Math.Between(660, 950), Phaser.Math.Between(255, 430), "⚡", { fontFamily: EMOJI_FONT, fontSize: "26px", resolution: TEXT_RES }).setOrigin(0.5);
+            this.tweens.add({ targets: s, alpha: 0, scale: 1.6, duration: 350, onComplete: () => s.destroy() });
+          },
+        });
+      }
+
+      this.addHotspot({
+        name: "무전기", x: 805, y: 345, w: 360, h: 220,
+        onTap: () => {
+          if (!GameState.flags.radioUnlocked) {
+            say("암호를 몰라서 쓸 수가 없네...");
+            return;
+          }
+          if (GameState.flags.quizSolved) { this.goTo("PUZZLE_CAT_DIFFERENCE"); return; }
+          openPasswordModal(() => this.goTo("PUZZLE_CAT_DIFFERENCE"));
+        },
+      });
+      this.addHotspot({
+        name: "조타 핸들", x: 300, y: 430, w: 230, h: 230,
+        onTap: () => say("핸들은 멀쩡하지만 엔진이 완전히 망가졌다. 구조 요청밖에 방법이 없어."),
+      });
+      this.addHotspot({
+        name: "창문", x: 640, y: 148, w: 920, h: 200, flash: false,
+        onTap: () => say("수평선 너머로 해가 지고 있다… 오늘 안에 퇴근할 수 있을까?"),
+      });
+    }
+  }
+
+  /* =====================================================================
+   *  10-⑦ 미니게임: 귀여운 고양이 틀린그림찾기 (PUZZLE_CAT_DIFFERENCE)
+   *
+   *  - 좌측 원본 / 우측 틀린 그림 (각 510 x 470)
+   *  - 어느 쪽 그림을 터치해도 정답 인정, 정답 판정 반경 42px
+   *  - 3곳을 다 찾으면 "고양이가 안테나를 건드려 신호 연결" → HAPPY END
+   * ===================================================================== */
+  const CAT = { W: 510, H: 470, TOP: 116, LEFT_X: 100, RIGHT_X: 650, HIT_R: 42 };
+  const CAT_SPOTS = [
+    { id: "ribbon", name: "귀 리본 색깔", hits: [[190, 128]], ring: { x: 190, y: 128, w: 96, h: 96 } },
+    { id: "yarn", name: "털실 뭉치 색깔", hits: [[372, 408]], ring: { x: 372, y: 408, w: 96, h: 96 } },
+    { id: "cheek", name: "분홍 볼터치", hits: [[196, 246], [304, 246]], ring: { x: 250, y: 246, w: 196, h: 74 } },
+  ];
+
+  /** 아늑한 방 + 치즈 고양이 (variant: "left" 원본 / "right" 틀린 그림) — 패널 왼쪽 위가 (0,0) */
+  function paintCatRoom(g, variant) {
+    const O = 0x3b2a1c, W = CAT.W, H = CAT.H, R = variant === "right";
+    const ORANGE = 0xf4a340, ORANGE_D = 0xe08a2b, CREAM = 0xfde7c7, PINK = 0xf7a1b5;
+
+    // 벽 · 벽지 · 걸레받이 · 나무 바닥
+    g.fillStyle(0xf6e3c4, 1).fillRect(0, 0, W, 332);
+    g.fillStyle(0xecd2a8, 1);
+    for (let y = 22; y < 320; y += 38) for (let x = (y / 38) % 2 ? 40 : 20; x < W; x += 40) g.fillCircle(x, y, 3);
+    g.fillStyle(0xd29d6a, 1).fillRect(0, 332, W, H - 332);
+    g.lineStyle(2, 0xb07a4a, 1).lineBetween(0, 364, W, 364).lineBetween(0, 400, W, 400).lineBetween(0, 438, W, 438);
+    [[80, 332, 364], [300, 332, 364], [180, 364, 400], [420, 364, 400], [60, 400, 438], [330, 400, 438], [200, 438, H]]
+      .forEach(([x, y1, y2]) => g.lineBetween(x, y1, x, y2));
+    g.fillStyle(0xc08a5a, 1).fillRect(0, 322, W, 12);
+    g.fillStyle(0xdcae7c, 1).fillRect(0, 322, W, 3);
+
+    // 창문 (하늘 · 해 · 구름 · 창살 · 창틀)
+    g.fillStyle(O, 1).fillRoundedRect(30, 30, 150, 128, 10);
+    g.fillStyle(0x9a6a3c, 1).fillRoundedRect(34, 34, 142, 120, 8);
+    g.fillStyle(0xbfe6f7, 1).fillRect(44, 44, 122, 100);
+    g.fillStyle(0xfff1b8, 1).fillCircle(142, 68, 14);
+    g.fillStyle(0xffffff, 1).fillCircle(70, 108, 12).fillCircle(86, 102, 15).fillCircle(102, 110, 11).fillRect(62, 108, 48, 12);
+    g.fillStyle(0x9a6a3c, 1).fillRect(101, 44, 8, 100).fillRect(44, 90, 122, 8);
+    g.fillStyle(O, 1).fillRoundedRect(22, 150, 166, 16, 5);
+    g.fillStyle(0xb07a4a, 1).fillRoundedRect(25, 152, 160, 11, 4);
+
+    // 벽 액자 (물고기 그림)
+    g.fillStyle(O, 1).fillRoundedRect(376, 46, 98, 78, 6);
+    g.fillStyle(0xc08a5a, 1).fillRoundedRect(380, 50, 90, 70, 5);
+    g.fillStyle(0xd6f1fb, 1).fillRect(390, 60, 70, 50);
+    g.fillStyle(0x60a5fa, 1).fillEllipse(420, 85, 36, 18).fillTriangle(436, 85, 450, 75, 450, 95);
+    g.fillStyle(O, 1).fillCircle(410, 82, 2.5);
+
+    // 러그
+    g.fillStyle(O, 1).fillEllipse(255, 412, 430, 104);
+    g.fillStyle(0xe07a5f, 1).fillEllipse(255, 410, 420, 94);
+    g.fillStyle(0xf2cc8f, 1).fillEllipse(255, 410, 360, 70);
+    g.fillStyle(0xe07a5f, 1).fillEllipse(255, 410, 300, 50);
+    g.fillStyle(0x000000, 0.15).fillEllipse(255, 402, 240, 34);
+
+    // 꼬리 (몸 뒤로 말려 올라감)
+    const tail = [{ x: 300, y: 382 }, { x: 352, y: 372 }, { x: 388, y: 338 }, { x: 394, y: 298 }, { x: 376, y: 272 }];
+    g.lineStyle(32, O, 1).strokePoints(tail);
+    g.fillStyle(O, 1).fillCircle(376, 272, 16);
+    g.lineStyle(24, ORANGE, 1).strokePoints(tail);
+    g.fillStyle(ORANGE_D, 1).fillCircle(376, 272, 12);
+
+    // 몸통 + 배
+    g.fillStyle(O, 1).fillEllipse(250, 320, 208, 188);
+    g.fillStyle(ORANGE, 1).fillEllipse(250, 320, 198, 178);
+    g.fillStyle(CREAM, 1).fillEllipse(250, 342, 116, 122);
+    g.lineStyle(6, ORANGE_D, 1).lineBetween(164, 300, 180, 306).lineBetween(162, 324, 180, 328).lineBetween(336, 300, 320, 306).lineBetween(338, 324, 320, 328);
+
+    // 귀 (머리보다 먼저 → 머리가 귀 아랫부분을 덮음)
+    [[[172, 168], [180, 92], [232, 140]], [[328, 168], [320, 92], [268, 140]]].forEach(([a, b, c]) => {
+      g.fillStyle(O, 1).fillTriangle(a[0] - 5, a[1] + 3, b[0], b[1] - 7, c[0] + (a[0] < 250 ? 6 : -6), c[1] + 2);
+      g.fillStyle(ORANGE, 1).fillTriangle(a[0], a[1], b[0], b[1], c[0], c[1]);
+    });
+    g.fillStyle(0xf7b2bd, 1).fillTriangle(186, 150, 188, 112, 216, 140).fillTriangle(314, 150, 312, 112, 284, 140);
+
+    // 머리
+    g.fillStyle(O, 1).fillEllipse(250, 212, 200, 176);
+    g.fillStyle(ORANGE, 1).fillEllipse(250, 212, 190, 166);
+    g.fillStyle(0xfbbf6a, 1).fillEllipse(226, 176, 70, 26);
+    g.fillStyle(CREAM, 1).fillEllipse(250, 248, 92, 52);
+    [[238, 136, 240, 154], [250, 132, 250, 156], [262, 136, 260, 154]].forEach(([x1, y1, x2, y2]) => {
+      g.lineStyle(7, ORANGE_D, 1).lineBetween(x1, y1, x2, y2);
+      g.fillStyle(ORANGE_D, 1).fillCircle(x1, y1, 3.5).fillCircle(x2, y2, 3.5);
+    });
+
+    // ★ Spot 3: 볼터치 (원본에만 있음)
+    if (!R) g.fillStyle(PINK, 0.9).fillEllipse(196, 246, 38, 22).fillEllipse(304, 246, 38, 22);
+
+    // 감은 눈 · 코 · 입(ω) · 수염
+    g.lineStyle(5, O, 1);
+    g.beginPath().arc(218, 206, 14, 0.15 * Math.PI, 0.85 * Math.PI).strokePath();
+    g.beginPath().arc(282, 206, 14, 0.15 * Math.PI, 0.85 * Math.PI).strokePath();
+    g.fillStyle(O, 1).fillTriangle(240, 225, 260, 225, 250, 238);
+    g.fillStyle(0xf28fa5, 1).fillTriangle(243, 227, 257, 227, 250, 235);
+    g.lineStyle(3, O, 1);
+    g.beginPath().arc(244, 240, 6, 0.1 * Math.PI, 0.95 * Math.PI).strokePath();
+    g.beginPath().arc(256, 240, 6, 0.05 * Math.PI, 0.9 * Math.PI).strokePath();
+    g.lineStyle(3, O, 0.85);
+    [[206, 236, 158, 226], [206, 244, 156, 246], [208, 252, 162, 266]].forEach(([x1, y1, x2, y2]) => {
+      g.lineBetween(x1, y1, x2, y2);
+      g.lineBetween(500 - x1, y1, 500 - x2, y2);
+    });
+
+    // 통통한 앞발
+    [214, 286].forEach((x) => {
+      g.fillStyle(O, 1).fillEllipse(x, 398, 70, 46);
+      g.fillStyle(ORANGE, 1).fillEllipse(x, 397, 62, 38);
+      g.fillStyle(0xfbbf6a, 1).fillEllipse(x - 6, 388, 30, 10);
+      g.lineStyle(3, O, 0.8).lineBetween(x - 9, 404, x - 9, 414).lineBetween(x + 9, 404, x + 9, 414);
+    });
+
+    // ★ Spot 1: 왼쪽 귀 리본 (원본 노랑 / 틀린 그림 빨강)
+    const ribbon = R ? 0xef4444 : 0xfacc15, ribbonD = R ? 0xb91c1c : 0xca8a04;
+    g.fillStyle(O, 1).fillTriangle(190, 128, 154, 106, 156, 152).fillTriangle(190, 128, 226, 106, 224, 152);
+    g.fillStyle(ribbon, 1).fillTriangle(186, 128, 159, 112, 161, 146).fillTriangle(194, 128, 221, 112, 219, 146);
+    g.fillStyle(ribbonD, 1).fillTriangle(186, 132, 161, 146, 166, 136).fillTriangle(194, 132, 219, 146, 214, 136);
+    g.fillStyle(O, 1).fillCircle(190, 128, 11);
+    g.fillStyle(ribbon, 1).fillCircle(190, 128, 8);
+    g.fillStyle(0xffffff, 0.7).fillCircle(187, 125, 2.5);
+
+    // ★ Spot 2: 털실 뭉치 (원본 파랑 / 틀린 그림 초록) + 앞발까지 이어진 실
+    const yarn = R ? 0x4ade80 : 0x60a5fa, yarnD = R ? 0x16a34a : 0x2563eb, yarnL = R ? 0xbbf7d0 : 0xbfdbfe;
+    g.lineStyle(4, yarnD, 1).strokePoints([{ x: 344, y: 412 }, { x: 326, y: 418 }, { x: 312, y: 410 }, { x: 300, y: 404 }]);
+    g.fillStyle(O, 1).fillCircle(372, 408, 35);
+    g.fillStyle(yarn, 1).fillCircle(372, 408, 31);
+    g.lineStyle(3, yarnD, 1);
+    g.beginPath().arc(360, 400, 26, -0.4, 1.3).strokePath();
+    g.beginPath().arc(384, 414, 24, 2.4, 4.2).strokePath();
+    g.beginPath().arc(372, 396, 22, 0.3, 2.6).strokePath();
+    g.fillStyle(yarnL, 1).fillEllipse(362, 394, 14, 7);
+  }
+
+  class CatDifferenceScene extends CloseupScene {
+    constructor() { super("PUZZLE_CAT_DIFFERENCE", "🐱 무전기 수신 테스트"); this.backTo = "CLOSEUP_BOAT"; }
+
+    drawScene() {
+      const F = GameState.flags;
+      F.catFound = F.catFound || [];
+      this.done = false;
+
+      // 배경: 조타실 나무 벽
+      const bg = this.add.graphics();
+      bg.fillStyle(0x5b3a1e, 1).fillRect(0, 0, GAME_W, VIEW_H);
+      bg.lineStyle(2, 0x4a2f17, 1);
+      for (let y = 24; y < VIEW_H; y += 44) bg.lineBetween(0, y, GAME_W, y);
+
+      // 좌/우 그림 패널 (우드 액자)
+      this.panels = [
+        { x: CAT.LEFT_X, y: CAT.TOP, variant: "left", tag: "원본", ringColor: 0x22c55e },
+        { x: CAT.RIGHT_X, y: CAT.TOP, variant: "right", tag: "다른 그림", ringColor: 0xec4899 },
+      ];
+      this.panels.forEach((p) => {
+        const fr = this.add.graphics();
+        fr.fillStyle(C.outline, 1).fillRoundedRect(p.x - 14, p.y - 14, CAT.W + 28, CAT.H + 28, 18);
+        fr.fillStyle(C.wood, 1).fillRoundedRect(p.x - 10, p.y - 10, CAT.W + 20, CAT.H + 20, 15);
+        fr.fillStyle(C.woodLight, 1).fillRoundedRect(p.x - 2, p.y - 9, CAT.W + 4, 5, 3);
+        fr.fillStyle(C.outline, 1).fillRect(p.x - 3, p.y - 3, CAT.W + 6, CAT.H + 6);
+        p.art = this.add.container(p.x, p.y);
+        const g = this.add.graphics();
+        paintCatRoom(g, p.variant);
+        p.art.add(g);
+        p.marks = this.add.container(p.x, p.y).setDepth(20);
+        // 패널 이름표
+        const tag = this.add.text(p.x + 16, p.y + 12, p.tag, textStyle({ fontSize: "15px", fontStyle: "bold", color: C.cream, backgroundColor: "#6b4423", padding: { x: 9, y: 3 } })).setDepth(21);
+        // 터치 영역: 어느 쪽 그림을 눌러도 같은 판정
+        const zone = this.add.zone(p.x + CAT.W / 2, p.y + CAT.H / 2, CAT.W, CAT.H).setInteractive({ useHandCursor: true });
+        zone.on("pointerdown", (ptr) => this.handleTap(ptr.x, ptr.y));
+        if (DEBUG) CAT_SPOTS.forEach((s) => s.hits.forEach(([hx, hy]) => this.add.circle(p.x + hx, p.y + hy, CAT.HIT_R).setStrokeStyle(2, 0xff0055).setDepth(90)));
+        void tag;
+      });
+
+      // 상단 안내 바
+      this.guideBar = this.add.graphics().setDepth(30);
+      this.guideText = this.add.text(GAME_W / 2, 79, "", textStyle({ fontSize: "19px", fontStyle: "bold", color: C.ink })).setOrigin(0.5).setDepth(31);
+      this.updateGuide();
+
+      // ★ 시연용 [즉시 완료] (우측 하단 구석)
+      this.btnCheat = make3DButton(this, 1226, 548, 94, 40, "⚡ 즉시 완료", "stone", () => {
+        if (!this.done && !GameState.busy) this.cheat();
+      }, 14).setAlpha(0.8).setDepth(40);
+
+      // 이미 찾은 곳은 다시 표시 (뒤로 갔다 돌아온 경우)
+      CAT_SPOTS.forEach((s) => { if (F.catFound.includes(s.id)) this.drawFoundMark(s, false); });
+
+      if (!F.catIntroShown) {
+        F.catIntroShown = true;
+        say(
+          narr("무전기 화면에 수신 테스트용 그림 두 장이 떴다. 선장님네 고양이 사진이다!"),
+          "두 그림에서 다른 곳 3군데를 찾으면 신호가 잡힐 것 같아!"
+        );
+      }
+    }
+
+    remaining() { return CAT_SPOTS.length - GameState.flags.catFound.length; }
+
+    updateGuide() {
+      const left = this.remaining();
+      this.guideText.setText(`🐱 귀여운 고양이의 다른 곳 3군데를 찾아 터치하세요! (남은 개수: ${left}/3)`);
+      const w = Math.ceil(this.guideText.width) + 44;
+      const g = this.guideBar.clear();
+      g.fillStyle(C.outline, 1).fillRoundedRect(GAME_W / 2 - w / 2 - 3, 59, w + 6, 42, 14);
+      g.fillStyle(C.paperShade, 1).fillRoundedRect(GAME_W / 2 - w / 2, 62, w, 36, 11);
+      g.fillStyle(left === 0 ? 0xd9f99d : C.paper, 1).fillRoundedRect(GAME_W / 2 - w / 2, 62, w, 32, 11);
+    }
+
+    /** 화면 좌표 → 어느 패널이든 그림 안 좌표로 바꿔 판정 */
+    handleTap(x, y) {
+      if (this.done || GameState.busy || this.transitioning) return;
+      const p = this.panels.find((q) => x >= q.x && x <= q.x + CAT.W && y >= q.y && y <= q.y + CAT.H);
+      if (!p) return;
+      const lx = x - p.x, ly = y - p.y;
+      const found = GameState.flags.catFound;
+      const spot = CAT_SPOTS.find((s) => s.hits.some(([hx, hy]) => Math.hypot(lx - hx, ly - hy) <= CAT.HIT_R));
+      if (spot && !found.includes(spot.id)) {
+        found.push(spot.id);
+        this.drawFoundMark(spot, true);
+        this.updateGuide();
+        this.tweens.add({ targets: this.guideText, scale: 1.08, duration: 120, yoyo: true });
+        toast(`⭕ 찾았다! ${spot.name}  (남은 개수: ${this.remaining()}/3)`);
+        if (this.remaining() === 0) this.onCleared();
+      } else if (spot) {
+        toast("이미 찾은 곳이에요!");
+      } else {
+        this.wrongMark(x, y);
+      }
+    }
+
+    /** 정답: 좌(초록)·우(분홍) 양쪽에 동그라미가 통! 하고 커졌다 자리 잡음 */
+    drawFoundMark(spot, animate) {
+      this.panels.forEach((p) => {
+        const r = spot.ring;
+        const m = this.add.graphics();
+        m.lineStyle(11, 0xffffff, 0.9).strokeEllipse(0, 0, r.w, r.h);
+        m.lineStyle(6, p.ringColor, 1).strokeEllipse(0, 0, r.w, r.h);
+        m.setPosition(r.x, r.y);
+        p.marks.add(m);
+        if (!animate) return;
+        m.setScale(1.7).setAlpha(0);
+        this.tweens.add({ targets: m, scale: 1, alpha: 1, duration: 380, ease: "Back.easeOut" });
+        const s = this.add.graphics().setPosition(r.x + r.w / 2 - 6, r.y - r.h / 2 + 6);
+        drawStar(s, 12);
+        p.marks.add(s);
+        this.tweens.add({ targets: s, scale: { from: 0.2, to: 1.3 }, alpha: { from: 1, to: 0 }, angle: 90, duration: 600, onComplete: () => s.destroy() });
+      });
+    }
+
+    /** 오답: 빨간 ❌가 0.5초 떴다가 사라짐 */
+    wrongMark(x, y) {
+      const xm = this.add.graphics().setPosition(x, y).setDepth(60);
+      xm.lineStyle(14, 0xffffff, 0.95).lineBetween(-16, -16, 16, 16).lineBetween(16, -16, -16, 16);
+      xm.lineStyle(8, 0xef4444, 1).lineBetween(-16, -16, 16, 16).lineBetween(16, -16, -16, 16);
+      xm.setScale(0.5);
+      this.tweens.add({ targets: xm, scale: 1, duration: 110, ease: "Back.easeOut" });
+      this.tweens.add({ targets: xm, y: y - 12, alpha: 0, duration: 260, delay: 240, onComplete: () => xm.destroy() });
+    }
+
+    /** 시연용: 남은 곳을 순서대로 자동으로 찾음 (기록 +10분, 한 판에 한 번) */
+    cheat() {
+      const F = GameState.flags;
+      if (!F.usedTestPass) GameState.penaltySec += TEST_PASS_PENALTY_SEC;
+      F.usedTestPass = true;
+      toast(`⚡ 즉시 완료 — 기록 +${TEST_PASS_PENALTY_SEC / 60}분`);
+      GameState.busy = true;
+      const left = CAT_SPOTS.filter((s) => !F.catFound.includes(s.id));
+      left.forEach((s, i) => this.time.delayedCall(180 * i, () => {
+        F.catFound.push(s.id);
+        this.drawFoundMark(s, true);
+        this.updateGuide();
+        if (this.remaining() === 0) { GameState.busy = false; this.onCleared(); }
+      }));
+      if (!left.length) { GameState.busy = false; this.onCleared(); }
+    }
+
+    /** 클리어: 고양이가 안테나를 건드려 신호 연결 → 즉시 HAPPY END + 서버 전송 */
+    onCleared() {
+      if (this.done) return;
+      this.done = true;
+      GameState.flags.catSolved = true;
+      GameState.busy = true;
+      GameState.endTime = Date.now();               // 타이머 정지
+      setBackButton(null);
+
+      this.panels.forEach((p) => this.tweens.add({ targets: [p.art, p.marks], y: p.y - 14, duration: 160, yoyo: true, repeat: 1, ease: "Quad.easeOut" }));
+      this.cameras.main.flash(300, 190, 255, 200);
+
+      const banner = this.add.text(GAME_W / 2, 330, "📡 삐빅! 신호 연결!", textStyle({
+        fontSize: "46px", fontStyle: "bold", color: C.cream, stroke: "#3e2410", strokeThickness: 7,
+        backgroundColor: "rgba(43,29,20,0.78)", padding: { x: 26, y: 14 },
+      })).setOrigin(0.5).setDepth(80).setScale(0.4).setAlpha(0);
+      this.tweens.add({ targets: banner, scale: 1, alpha: 1, duration: 320, ease: "Back.easeOut" });
+
+      say(narr("고양이가 무전기 안테나를 건드려 신호가 연결되었습니다!"));
+      this.time.delayedCall(2300, () => showEnding({
+        type: "SUCCESS",
+        emoji: "🎉🚢",
+        title: "퇴근 성공 (HAPPY END)",
+        message: "🎉 퇴근하기 성공!!\n큰 배가 나타나 두 명을 구조했습니다!",
+        solvedQuiz: true,
+      }));
+    }
+  }
+
+  /* =====================================================================
+   *  11. UI 씬 (우드 인벤토리 · 양피지 대사창 · HUD · 토스트 · 뒤로가기 · 선택지 · 엔딩)
+   * ===================================================================== */
+  class UIScene extends Phaser.Scene {
+    constructor() { super("UIScene"); }
+
+    create() {
+      this.createInventoryBar();
+      this.createDialogue();
+      this.createHUD();
+      this.createToast();
+      this.createBackButton();
+      this.createQuest();
+      this.createCursorItem();
+
+      const ev = GameState.events;
+      const handlers = {
+        "inventory-changed": this.onInventoryChanged,
+        "selection-changed": this.onSelectionChanged,
+        "slot-bump": this.bumpSlot,
+        quest: this.setQuest,
+        say: this.onSay,
+        toast: this.showToast,
+        "set-back": this.setBack,
+        choice: this.showChoice,
+        ending: this.showEnding,
+        "hide-dialogue": this.hideDialogue,
+      };
+      Object.entries(handlers).forEach(([k, fn]) => ev.on(k, fn, this));
+      this.events.once("shutdown", () => Object.entries(handlers).forEach(([k, fn]) => ev.off(k, fn, this)));
+
+      if (DEBUG === "fsm") {
+        Inventory.add("branch", 10); ["magazine", "lighter", "pot_water", "ramen_raw", "recipe"].forEach((id) => Inventory.add(id));
+      }
+      if (DEBUG === "ramen") {
+        Inventory.add("ramen_cooked");
+        this.setQuest("📌 부장님께 라면 가져가기");
+      }
+    }
+
+    /* ── 선택한 아이템이 손가락/마우스를 따라다니는 플로팅 아이콘 ── */
+    createCursorItem() {
+      this.cursorTarget = { x: GAME_W / 2, y: VIEW_H - 40 };
+      const ci = (this.cursorItem = this.add.container(0, 0).setDepth(500).setVisible(false));
+      const g = this.add.graphics();
+      g.fillStyle(0x000000, 0.22).fillEllipse(4, 34, 48, 12);
+      g.fillStyle(C.outline, 1).fillCircle(0, 0, 33);
+      g.fillStyle(0xffc53d, 1).fillCircle(0, 0, 30);
+      g.fillStyle(0xffe08a, 1).fillCircle(0, -3, 27);
+      g.fillStyle(C.paper, 1).fillCircle(0, 0, 25);
+      this.cursorImg = this.add.image(0, 0, "icon_branch").setDisplaySize(44, 44);
+      ci.add([g, this.cursorImg]);
+      this.tweens.add({ targets: this.cursorImg, angle: { from: -8, to: 8 }, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+
+      this.input.on("pointermove", (p) => this.trackPointer(p));
+      this.input.on("pointerdown", (p) => {
+        this.trackPointer(p);
+        if (ci.visible) ci.setPosition(this.cursorTarget.x, this.cursorTarget.y);   // 터치는 순간이동
+      });
+    }
+
+    /** 손가락 터치는 손끝에 가리지 않게 위쪽으로, 마우스는 커서 오른쪽 아래로 */
+    trackPointer(p) {
+      const touch = !!p.wasTouch;
+      this.cursorTarget.x = Phaser.Math.Clamp(p.x + (touch ? 0 : 30), 34, GAME_W - 34);
+      this.cursorTarget.y = Phaser.Math.Clamp(p.y + (touch ? -64 : 30), 34, GAME_H - 34);
+    }
+
+    onSelectionChanged(id) {
+      this.refreshInventory();
+      const ci = this.cursorItem;
+      this.tweens.killTweensOf(ci);
+      if (id) {
+        if (this.input.activePointer) this.trackPointer(this.input.activePointer);
+        this.cursorImg.setTexture("icon_" + id).setDisplaySize(44, 44);
+        ci.setPosition(this.cursorTarget.x, this.cursorTarget.y).setVisible(true).setAlpha(1).setScale(0.3);
+        this.tweens.add({ targets: ci, scale: 1, duration: 220, ease: "Back.easeOut" });
+      } else if (ci.visible) {
+        this.tweens.add({ targets: ci, scale: 0, alpha: 0, duration: 160, ease: "Quad.easeIn", onComplete: () => ci.setVisible(false) });
+      }
+    }
+
+    update(time, delta) {
+      const ci = this.cursorItem;
+      if (!ci || !ci.visible) return;
+      const k = 1 - Math.exp(-delta / 55);              // 부드럽게 따라붙기
+      ci.x += (this.cursorTarget.x - ci.x) * k;
+      ci.y += (this.cursorTarget.y - ci.y) * k;
+    }
+
+    /* ── 퀘스트 안내 배너 (HUD 아래, 다음 할 일 고정 표시) ── */
+    createQuest() {
+      this.questBox = this.add.container(16, 72).setDepth(45).setVisible(false);
+      this.questGlow = this.add.graphics();
+      this.questPlate = this.add.graphics();
+      this.questText = this.add.text(24, 23, "", textStyle({ fontSize: "17px", fontStyle: "bold", color: C.ink })).setOrigin(0, 0.5);
+      this.questBox.add([this.questGlow, this.questPlate, this.questText]);
+    }
+
+    setQuest(text) {
+      const b = this.questBox;
+      this.tweens.killTweensOf([b, this.questGlow]);
+      if (!text) {
+        if (b.visible) this.tweens.add({ targets: b, alpha: 0, duration: 250, onComplete: () => b.setVisible(false) });
+        return;
+      }
+      this.questText.setText(text);
+      const w = Math.ceil(this.questText.width) + 46;
+      this.questGlow.clear().fillStyle(0xffd34d, 1).fillRoundedRect(-8, -8, w + 16, 62, 20);
+      const p = this.questPlate.clear();
+      p.fillStyle(C.outline, 1).fillRoundedRect(-3, -3, w + 6, 52, 15);
+      p.fillStyle(C.paperShade, 1).fillRoundedRect(0, 0, w, 46, 12);
+      p.fillStyle(C.paper, 1).fillRoundedRect(0, 0, w, 41, 12);
+      p.fillStyle(0xe8590c, 1).fillRoundedRect(0, 0, 10, 46, { tl: 12, bl: 12, tr: 0, br: 0 });
+      b.setVisible(true).setAlpha(1).setX(-w - 20);
+      this.questGlow.setAlpha(0);
+      this.tweens.add({ targets: b, x: 16, duration: 480, ease: "Back.easeOut" });
+      this.tweens.add({ targets: this.questGlow, alpha: { from: 0.55, to: 0 }, duration: 700, delay: 480, repeat: 3 });
+      if (this.backBtn.visible) {                          // 클로즈업이면 "뒤로가기"로 시선 유도
+        this.tweens.add({ targets: this.backBtn, scale: 1.1, duration: 260, yoyo: true, repeat: 3, delay: 600 });
+      }
+    }
+
+    /* ── 우드 인벤토리 바 + 베이지 슬롯 ── */
+    createInventoryBar() {
+      const g = this.add.graphics();
+      const Y = VIEW_H;
+      // 어두운 반투명 우드 패널 (뒤의 모래사장이 은은하게 비침)
+      g.fillStyle(0x000000, 0.25).fillRoundedRect(10, Y + 9, GAME_W - 20, GAME_H - Y - 12, 22);
+      g.fillStyle(C.woodDark, 0.85).fillRoundedRect(8, Y + 5, GAME_W - 16, GAME_H - Y - 12, 22);
+      g.fillStyle(0x7a4a24, 0.55).fillRoundedRect(14, Y + 11, GAME_W - 28, GAME_H - Y - 24, 18);
+      g.fillStyle(C.woodLight, 0.6).fillRoundedRect(30, Y + 13, GAME_W - 60, 4, 2);
+      g.lineStyle(3, C.wood, 0.9).strokeRoundedRect(8, Y + 5, GAME_W - 16, GAME_H - Y - 12, 22);
+      g.fillStyle(C.woodDark, 0.9);
+      [[24, Y + 20], [GAME_W - 24, Y + 20], [24, GAME_H - 22], [GAME_W - 24, GAME_H - 22]].forEach(([x, y]) => g.fillCircle(x, y, 3.5));
+      this.add.zone(GAME_W / 2, Y + 60, GAME_W, 120).setInteractive();
+
+      const { SW, SH } = INV;
+
+      this.slots = [];
+      for (let i = 0; i < SLOT_COUNT; i++) {
+        const { x, y: cy } = slotCenter(i);
+        const slot = {
+          x, y: cy, w: SW, h: SH,
+          bg: this.add.graphics(),
+          icon: this.add.image(x, cy - 11, "icon_branch").setDisplaySize(56, 56).setVisible(false),
+          name: this.add.text(x, cy + 29, "", textStyle({ fontSize: "15px", fontStyle: "bold", color: C.ink })).setOrigin(0.5),
+          badge: this.add.graphics(),
+          count: this.add.text(x + SW / 2 - 18, cy - SH / 2 + 15, "", textStyle({ fontSize: "14px", fontStyle: "bold", color: C.cream })).setOrigin(0.5),
+        };
+        slot.baseScale = slot.icon.scaleX;
+        this.add.zone(x, cy, SW, SH).setInteractive({ useHandCursor: true }).on("pointerdown", () => this.onSlotTap(i));
+        this.slots.push(slot);
+      }
+      this.refreshInventory();
+    }
+
+    refreshInventory() {
+      this.slots.forEach((s, i) => {
+        const item = GameState.inventory[i];
+        const def = item && ITEMS[item.id];
+        const selected = !!item && GameState.selected === item.id;
+        const L = s.x - s.w / 2, T = s.y - s.h / 2, W = s.w, H = s.h;
+
+        s.bg.clear();
+        if (selected) s.bg.fillStyle(0xffe08a, 0.45).fillRoundedRect(L - 9, T - 9, W + 18, H + 18, 22);
+        s.bg.fillStyle(C.outline, 1).fillRoundedRect(L - 4, T - 4, W + 8, H + 8, 18);            // 두꺼운 어두운 테두리
+        s.bg.fillStyle(selected ? 0xffc53d : C.wood, 1).fillRoundedRect(L, T, W, H, 15);          // 프레임 (선택 시 금색)
+        s.bg.fillStyle(selected ? 0xffe08a : C.woodLight, 1).fillRoundedRect(L + 5, T + 3, W - 10, 5, 3);
+        s.bg.fillStyle(C.paperShade, 1).fillRoundedRect(L + 7, T + 7, W - 14, H - 14, 10);       // 안쪽 그림자 톤
+        s.bg.fillStyle(def ? C.paper : 0xe6d2a8, 1).fillRoundedRect(L + 8, T + 13, W - 16, H - 21, 9);
+        if (def) s.bg.fillStyle(def.color, 0.12).fillRoundedRect(L + 8, T + 13, W - 16, H - 21, 9);
+
+        s.icon.setVisible(!!def);
+        if (def) s.icon.setTexture("icon_" + item.id).setDisplaySize(56, 56);
+        s.name.setText(def ? def.name : "").setColor(selected ? "#9a3412" : C.ink);
+
+        s.badge.clear();
+        const countLabel = def ? (def.max > 1 ? `${item.count}/${def.max}` : item.count > 1 ? `x${item.count}` : "") : "";
+        s.count.setText(countLabel);
+        if (countLabel) {
+          const bw = s.count.width + 14;
+          s.badge.fillStyle(C.outline, 1).fillRoundedRect(s.x + W / 2 - 18 - bw / 2 - 2, T + 4, bw + 4, 24, 10);
+          s.badge.fillStyle(0x9a3412, 1).fillRoundedRect(s.x + W / 2 - 18 - bw / 2, T + 6, bw, 20, 8);
+          s.count.setX(s.x + W / 2 - 18);
+        }
+      });
+    }
+
+    onInventoryChanged({ id, delta, quiet }) {
+      this.refreshInventory();
+      if (delta > 0 && !quiet) this.bumpSlot(id);
+    }
+
+    /** 슬롯 아이콘 통통 튕기기 (줍기 연출이 슬롯에 도착하는 순간) */
+    bumpSlot(id) {
+      const s = this.slots[GameState.inventory.findIndex((i) => i.id === id)];
+      if (!s) return;
+      this.tweens.killTweensOf(s.icon);
+      s.icon.setDisplaySize(56, 56);
+      const base = s.icon.scaleX;
+      this.tweens.add({ targets: s.icon, scaleX: base * 1.4, scaleY: base * 1.4, duration: 140, yoyo: true, ease: "Quad.easeOut" });
+    }
+
+    onSlotTap(i) {
+      if (GameState.busy) return;
+      const item = GameState.inventory[i];
+      if (!item) { Inventory.select(null); return; }
+      if (GameState.selected === item.id) { Inventory.select(null); return; }
+      Inventory.select(item.id);
+      const def = ITEMS[item.id];
+      if (def.onSelect) def.onSelect();
+      else toast(`👉 ${def.name} 선택 — 사용할 곳을 터치하세요`);
+    }
+
+    /* ── 상단 반투명 대사창: 부드럽게 나타나고, 2.5~3초 뒤 저절로 사라짐 · 터치하면 넘김/닫기 ── */
+    createDialogue() {
+      const W = (this.dlgW = 580);                       // 좌측 HUD(이름표)와 우측 [뒤로가기] 사이에 들어가는 폭
+      this.dlgTop = 10;
+      this.dlg = this.add.container(GAME_W / 2, this.dlgTop).setDepth(50).setVisible(false).setAlpha(0);
+      this.dlgBg = this.add.graphics();
+      this.dlgSpeaker = this.add.text(-W / 2 + 20, 9, "", textStyle({ fontSize: "15px", fontStyle: "bold", color: "#f3c969" }));
+      this.dlgText = this.add.text(-W / 2 + 20, 10, "", textStyle({
+        fontSize: "19px", color: "#fdf6e3", lineSpacing: 5, wordWrap: { width: W - 64, useAdvancedWrap: true },
+      }));
+      this.dlgArrow = this.add.text(W / 2 - 20, 0, "", textStyle({ fontSize: "14px", fontStyle: "bold", color: "#f3c969" })).setOrigin(0.5);
+      this.tweens.add({ targets: this.dlgArrow, alpha: 0.25, duration: 500, yoyo: true, repeat: -1 });
+      this.dlgHit = this.add.zone(0, 0, W, 60).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
+      this.dlgHit.on("pointerdown", () => this.advanceDialogue());
+      this.dlg.add([this.dlgBg, this.dlgSpeaker, this.dlgText, this.dlgArrow, this.dlgHit]);
+      this.dlgQueue = [];
+    }
+
+    /** 대사 한 줄 분량에 맞춰 상자 높이를 다시 그림 (타이핑 중에 상자가 출렁이지 않도록 전체 문장으로 미리 측정) */
+    layoutDialogue(ln) {
+      const W = this.dlgW, hasSpeaker = !!ln.speaker;
+      this.dlgSpeaker.setText(ln.speaker || "");
+      this.dlgText.setY(hasSpeaker ? 31 : 12).setText(ln.text)
+        .setColor(hasSpeaker ? "#fdf6e3" : "#e9dcc0").setFontStyle(hasSpeaker ? "normal" : "italic");
+      const H = Math.ceil(this.dlgText.y + this.dlgText.height + 12);
+      const g = this.dlgBg.clear();
+      g.fillStyle(0x000000, 0.22).fillRoundedRect(-W / 2 + 3, 4, W, H, 12);          // 은은한 그림자
+      g.fillStyle(0x1e140c, 0.72).fillRoundedRect(-W / 2, 0, W, H, 12);             // 짙은 밤색 반투명 배경
+      g.lineStyle(2, 0xd9b26a, 0.95).strokeRoundedRect(-W / 2, 0, W, H, 12);         // 얇은 골드 테두리
+      g.lineStyle(1, 0xfff1c9, 0.16).strokeRoundedRect(-W / 2 + 4, 4, W - 8, H - 8, 9);
+      if (hasSpeaker) g.fillStyle(0xd9b26a, 0.55).fillRect(-W / 2 + 20, 28, Math.min(this.dlgSpeaker.width, W - 60), 1);
+      this.dlgArrow.setPosition(W / 2 - 18, H - 15);
+      this.dlgHit.setSize(W, H);
+    }
+
+    onSay(lines) {
+      this.dlgQueue = [...lines];
+      this.tweens.killTweensOf(this.dlg);
+      const wasHidden = !this.dlg.visible || this.dlg.alpha < 0.05;
+      this.dlg.setVisible(true);
+      if (wasHidden) this.dlg.setAlpha(0).setY(this.dlgTop - 12);
+      this.tweens.add({ targets: this.dlg, alpha: 1, y: this.dlgTop, duration: 200, ease: "Quad.easeOut" });   // 페이드 인
+      GameState.events.emit("dialog", true);
+      this.nextLine();
+    }
+
+    nextLine() {
+      this.clearDialogueTimer();
+      const ln = this.dlgQueue.shift();
+      if (!ln) { this.hideDialogue(); return; }
+
+      this.layoutDialogue(ln);
+      this.dlgArrow.setVisible(false);
+      const chars = Array.from(ln.text);
+      this.fullText = ln.text;
+      this.dlgChars = chars.length;
+      this.typing = true;
+      let i = 0;
+      this.dlgText.setText("");
+      if (this.typeEvent) this.typeEvent.remove();
+      this.typeEvent = this.time.addEvent({
+        delay: 24, repeat: chars.length - 1,
+        callback: () => {
+          i++;
+          this.dlgText.setText(chars.slice(0, i).join(""));
+          if (i >= chars.length) this.finishTyping();
+        },
+      });
+    }
+
+    finishTyping() {
+      this.typing = false;
+      if (this.typeEvent) { this.typeEvent.remove(); this.typeEvent = null; }
+      this.dlgText.setText(this.fullText);
+      const more = this.dlgQueue.length > 0;
+      this.dlgArrow.setText(more ? "▶" : "✕").setVisible(true);
+      // 터치가 없으면: 다음 줄이 있으면 자동으로 넘기고, 마지막 줄이면 서서히 사라짐
+      // 짧은 문장은 약 2.6초, 긴 힌트 대사는 읽을 시간을 조금 더 줌 (최대 6초)
+      const hold = Phaser.Math.Clamp(1600 + (this.dlgChars || 0) * 45, 2600, 6000);
+      this.autoHide = this.time.delayedCall(hold, () => (more ? this.nextLine() : this.fadeOutDialogue()));
+    }
+
+    advanceDialogue() {
+      if (this.typing) this.finishTyping();
+      else if (this.dlgQueue.length) this.nextLine();
+      else this.hideDialogue();                          // 마지막 줄에서 터치하면 즉시 닫기
+    }
+
+    clearDialogueTimer() {
+      if (this.autoHide) { this.autoHide.remove(); this.autoHide = null; }
+    }
+
+    /** 자동 페이드 아웃 (서서히 투명해지며 살짝 위로) */
+    fadeOutDialogue() {
+      this.clearDialogueTimer();
+      this.tweens.killTweensOf(this.dlg);
+      this.tweens.add({
+        targets: this.dlg, alpha: 0, y: this.dlgTop - 8, duration: 500, ease: "Quad.easeIn",
+        onComplete: () => this.dlg.setVisible(false),
+      });
+      GameState.events.emit("dialog", false);
+    }
+
+    /** 즉시 닫기 (터치 · 선택지/엔딩 열림 · 장면 전환) */
+    hideDialogue() {
+      this.clearDialogueTimer();
+      if (this.typeEvent) { this.typeEvent.remove(); this.typeEvent = null; }
+      this.typing = false;
+      this.dlgQueue = [];
+      if (!this.dlg.visible) return;
+      this.tweens.killTweensOf(this.dlg);
+      this.tweens.add({ targets: this.dlg, alpha: 0, duration: 140, onComplete: () => this.dlg.setVisible(false) });
+      GameState.events.emit("dialog", false);
+    }
+
+    /* ── HUD: 우드 명찰 ── */
+    createHUD() {
+      this.hudPlate = this.add.graphics().setDepth(39);
+      this.hud = this.add.text(36, 37, "", textStyle({ fontSize: "18px", fontStyle: "bold", color: C.cream, stroke: "#3e2410", strokeThickness: 3 })).setOrigin(0, 0.5).setDepth(40);
+      this.hudW = 0;
+      const update = () => {
+        this.hud.setText(`👔 ${GameState.playerName} 사원   ⏱ ${fmtTime(GameState.elapsedSec)}`);
+        const w = Math.ceil(this.hud.width + 40);
+        if (w !== this.hudW) {
+          this.hudW = w;
+          this.hudPlate.clear();
+          drawWood(this.hudPlate, 16, 16, w, 44, 12);
+        }
+      };
+      update();
+      this.time.addEvent({ delay: 1000, loop: true, callback: update });
+    }
+
+    /* ── 토스트: 우드 리본 ── */
+    createToast() {
+      this.toastBox = this.add.container(GAME_W / 2, VIEW_H - 46).setDepth(60).setAlpha(0);
+      this.toastPlate = this.add.graphics();
+      this.toastText = this.add.text(0, -2, "", textStyle({ fontSize: "21px", fontStyle: "bold", color: C.cream, stroke: "#3e2410", strokeThickness: 4 })).setOrigin(0.5);
+      this.toastBox.add([this.toastPlate, this.toastText]);
+    }
+
+    showToast(msg) {
+      const b = this.toastBox;
+      this.tweens.killTweensOf(b);
+      if (this.toastTimer) this.toastTimer.remove();
+      this.toastText.setText(msg);
+      const w = this.toastText.width + 48;
+      this.toastPlate.clear();
+      drawWood(this.toastPlate, -w / 2, -24, w, 46, 14);
+      b.setAlpha(0).setY(VIEW_H - 30);
+      this.tweens.add({ targets: b, alpha: 1, y: VIEW_H - 46, duration: 180, ease: "Quad.easeOut" });
+      this.toastTimer = this.time.delayedCall(1700, () => this.tweens.add({ targets: b, alpha: 0, duration: 300 }));
+    }
+
+    /* ── 뒤로가기: 3D 우드 버튼 ── */
+    createBackButton() {
+      this.backBtn = make3DButton(this, GAME_W - 112, 36, 184, 48, "← 뒤로가기", "wood", () => {
+        if (this.backHandler && !GameState.busy) this.backHandler();
+      }, 20).setDepth(70).setVisible(false);
+    }
+
+    setBack(handler) {
+      this.backHandler = handler;
+      this.backBtn.setVisible(!!handler);
+    }
+
+    /* ── 2지선다 팝업: 양피지 패널 + 3D 버튼 ── */
+    showChoice({ title, options }) {
+      GameState.busy = true;
+      this.hideDialogue();
+      const L = this.add.container(0, 0).setDepth(200).setAlpha(0);
+      const dim = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x1a0f07, 0.7).setInteractive();
+      const panel = this.add.graphics();
+      drawParchment(panel, 190, 110, 900, 420, 26);
+      const ribbon = this.add.graphics();
+      drawWood(ribbon, 400, 88, 480, 48, 14);
+      const rt = this.add.text(GAME_W / 2, 110, "선택의 시간", textStyle({ fontSize: "22px", fontStyle: "bold", color: C.cream, stroke: "#3e2410", strokeThickness: 4 })).setOrigin(0.5);
+      const t = this.add.text(GAME_W / 2, 196, title, textStyle({ fontSize: "30px", fontStyle: "bold", color: C.ink, align: "center", wordWrap: { width: 800, useAdvancedWrap: true } })).setOrigin(0.5);
+      L.add([dim, panel, ribbon, rt, t]);
+
+      let closed = false;
+      options.forEach((o, i) => {
+        const btn = make3DButton(this, GAME_W / 2, 302 + i * 116, 780, 82, o.label, o.style || "yellow", () => {
+          if (closed) return;
+          closed = true;
+          this.time.delayedCall(80, () => {
+            L.destroy();
+            GameState.busy = false;
+            o.onSelect();
+          });
+        }, 26);
+        L.add(btn);
+      });
+      this.tweens.add({ targets: L, alpha: 1, duration: 200 });
+    }
+
+    /* ── 엔딩 화면 + 결과 전송 ── */
+    showEnding({ type, emoji, title, message, solvedQuiz = false }) {
+      if (this.endingShown) return;
+      this.endingShown = true;
+      GameState.busy = true;
+      if (!GameState.endTime) GameState.endTime = Date.now();
+      this.hideDialogue();
+      this.setBack(null);
+      this.setQuest(null);
+      Inventory.select(null);
+
+      const ok = type === "SUCCESS";
+      const L = this.add.container(0, 0).setDepth(300).setAlpha(0);
+      const bg = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, ok ? 0x0f2a1a : 0x1a0a08, 0.93).setInteractive();
+      const card = this.add.graphics();
+      drawParchment(card, 230, 44, 820, 632, 28);
+      const ribbon = this.add.graphics();
+      drawWood(ribbon, 420, 206, 440, 64, 16);
+      const e = this.add.text(GAME_W / 2, 128, emoji, { fontFamily: EMOJI_FONT, fontSize: "80px", resolution: TEXT_RES }).setOrigin(0.5);
+      const t = this.add.text(GAME_W / 2, 236, title, textStyle({ fontSize: "40px", fontStyle: "bold", color: ok ? "#bbf7d0" : "#fecaca", stroke: "#2b1d14", strokeThickness: 6 })).setOrigin(0.5);
+      const m = this.add.text(GAME_W / 2, 336, message, textStyle({ fontSize: "27px", fontStyle: "bold", align: "center", lineSpacing: 10, color: C.ink })).setOrigin(0.5);
+      const sec = GameState.elapsedSec;
+      const penaltyNote = GameState.penaltySec ? `  (⚡ 테스트 패스 +${GameState.penaltySec / 60}분 포함)` : "";
+      const info = this.add.text(GAME_W / 2, 424, `👔 ${GameState.playerName} 사원     ⏱ 총 소요 시간 ${fmtTime(sec)} (${sec}초)${penaltyNote}`,
+        textStyle({ fontSize: "22px", fontStyle: "bold", color: C.inkSoft })).setOrigin(0.5);
+      const status = this.add.text(GAME_W / 2, 478, "📡 결과를 회사 서버에 전송 중…", textStyle({ fontSize: "21px", fontStyle: "bold", color: C.inkSoft })).setOrigin(0.5);
+      const btn = make3DButton(this, GAME_W / 2, 574, 380, 72, "🔁 처음부터 다시하기", "yellow", () => location.reload(), 24);
+
+      L.add([bg, card, ribbon, e, t, m, info, status, btn]);
+      this.tweens.add({ targets: L, alpha: 1, duration: 700 });
+      this.tweens.add({ targets: e, scale: 1.12, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+
+      const send = () => {
+        status.disableInteractive();
+        status.setText("📡 결과를 회사 서버에 전송 중…").setColor(C.inkSoft);
+        ApiClient.sendResult(type, solvedQuiz).then((res) => {
+          if (res) {
+            status.setText(ok && res.rank ? `🏆 리더보드 현재 ${res.rank}위!` : "✅ 결과가 리더보드에 기록되었습니다.").setColor("#2f7d32");
+          } else {
+            status.setText("⚠️ 전송 실패 — 여기를 탭해서 다시 시도").setColor("#b3261e").setInteractive({ useHandCursor: true });
+            status.once("pointerdown", send);
+          }
+        });
+      };
+      send();
+    }
+  }
+
+  /* =====================================================================
+   *  12. 시작 모달 → 게임 부팅
+   * ===================================================================== */
+  const modal = document.getElementById("start-modal");
+  const form = document.getElementById("start-form");
+  const nameInput = document.getElementById("player-name");
+  const startBtn = document.getElementById("start-btn");
+  const errorEl = document.getElementById("start-error");
+
+  const cleanName = (v) => v.replace(/\s+/g, " ").trim().slice(0, 20);
+
+  try { nameInput.value = localStorage.getItem("playerName") || ""; } catch (e) {}
+  startBtn.disabled = !cleanName(nameInput.value);
+
+  nameInput.addEventListener("input", () => {
+    startBtn.disabled = !cleanName(nameInput.value);
+    errorEl.textContent = "";
+  });
+
+  form.addEventListener("submit", (e) => { e.preventDefault(); startGame(); });
+
+  function requestLandscape() {
+    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    const el = document.documentElement;
+    const fs = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!fs) return;
+    Promise.resolve(fs.call(el, { navigationUI: "hide" }))
+      .then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape"))
+      .catch(() => {});
+  }
+
+  function startGame() {
+    const name = cleanName(nameInput.value);
+    if (!name) { errorEl.textContent = "이름을 입력해 주세요."; return; }
+    if (!window.Phaser) { errorEl.textContent = "게임 엔진을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요."; return; }
+
+    startBtn.disabled = true;
+    startBtn.textContent = "출근 중…";
+    nameInput.blur();
+    try { localStorage.setItem("playerName", name); } catch (e) {}
+
+    requestLandscape();
+
+    GameState.playerName = name;
+    GameState.events = new Phaser.Events.EventEmitter();
+    GameState.startTime = Date.now();
+    if (DEBUG === "radio") Object.assign(GameState.flags, { bossAwake: true, radioUnlocked: true });
+
+    modal.classList.add("hidden");
+    document.body.classList.add("playing");
+    setTimeout(() => modal.remove(), 400);
+
+    window.game = new Phaser.Game({
+      type: Phaser.AUTO,
+      parent: "game",
+      backgroundColor: "#2a1a0e",
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: GAME_W,
+        height: GAME_H,
+      },
+      input: { activePointers: 2 },
+      render: { antialias: true },
+      // BootScene이 아이콘을 만든 뒤 UIScene + IslandScene 시작. UIScene은 맨 뒤 = 항상 최상단
+      scene: [BootScene, IslandScene, TreeScene, RocksScene, BagScene, WaterfallScene, JunkScene, BoatScene, CatDifferenceScene, UIScene],
+    });
+  }
+
+  /* =====================================================================
+   *  13. 무전기 비밀번호 모달 (HTML 오버레이 — 모바일 한글 IME 입력 지원)
+   * ===================================================================== */
+  const pwModal = document.getElementById("pw-modal");
+  const pwCard = pwModal.querySelector(".pw-card");
+  const pwForm = document.getElementById("pw-form");
+  const pwInput = document.getElementById("pw-input");
+  const pwSubmit = document.getElementById("pw-submit");
+  const pwMsg = document.getElementById("pw-msg");
+  let pwOnSuccess = null;
+
+  /** 키보드가 열리며 브라우저가 화면을 밀어 올려도, 팝업은 '지금 보이는 영역'의 맨 위에 붙어 있도록 */
+  function pinPasswordCard() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    pwCard.style.top = `${Math.round(vv.offsetTop + Math.max(6, vv.height * 0.03))}px`;
+  }
+  function resetPageScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => { if (!pwModal.classList.contains("hidden")) pinPasswordCard(); });
+    window.visualViewport.addEventListener("scroll", () => { if (!pwModal.classList.contains("hidden")) pinPasswordCard(); });
+  }
+  pwInput.addEventListener("focus", () => setTimeout(() => { resetPageScroll(); pinPasswordCard(); }, 50));
+  // 팝업 바깥(어두운 배경)을 끌어도 페이지가 스크롤되지 않게
+  pwModal.addEventListener("touchmove", (e) => { if (e.target === pwModal) e.preventDefault(); }, { passive: false });
+
+  function openPasswordModal(onSuccess) {
+    pwOnSuccess = onSuccess;
+    GameState.busy = true;
+    GameState.events.emit("hide-dialogue");
+    pwInput.value = "";
+    pwInput.disabled = false;
+    pwSubmit.disabled = false;
+    pwMsg.textContent = "";
+    pwMsg.className = "msg";
+    document.body.classList.add("pw-open");
+    pwModal.classList.remove("hidden");
+    pinPasswordCard();
+    setTimeout(() => {
+      try { pwInput.focus({ preventScroll: true }); } catch (e) { pwInput.focus(); }
+      resetPageScroll();
+    }, 60);
+  }
+
+  function closePasswordModal() {
+    pwInput.blur();
+    pwModal.classList.add("hidden");
+    document.body.classList.remove("pw-open");
+    pwCard.style.top = "";
+    GameState.busy = false;
+    // 키보드가 내려간 뒤 캔버스 크기·위치를 원래대로
+    setTimeout(() => { resetPageScroll(); if (window.game && window.game.scale) window.game.scale.refresh(); }, 300);
+  }
+
+  document.getElementById("pw-cancel").addEventListener("click", closePasswordModal);
+
+  pwForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const answer = pwInput.value.normalize("NFC").trim();
+    if (!answer) {
+      pwMsg.textContent = "암호를 입력해 주세요. (한글)";
+      pwMsg.className = "msg err";
+      return;
+    }
+    if (answer === RADIO_PASSWORD) {
+      pwMsg.textContent = "비밀번호 일치! 수신기 전선 회로가 열렸습니다!";
+      pwMsg.className = "msg ok";
+      pwInput.disabled = true;
+      pwSubmit.disabled = true;
+      GameState.flags.quizSolved = true;
+      setTimeout(() => {
+        closePasswordModal();
+        if (pwOnSuccess) pwOnSuccess();
+      }, 1300);
+    } else {
+      pwMsg.textContent = "비밀번호가 일치하지 않습니다. (힌트: AI가 텍스트를 쪼개어 처리하는 기본 단위)";
+      pwMsg.className = "msg err";
+      pwCard.classList.remove("shake");
+      void pwCard.offsetWidth;
+      pwCard.classList.add("shake");
+      pwInput.select();
+    }
+  });
+
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // 콘솔 테스트용
+  Object.assign(window, { GameState, Inventory, ApiClient, say });
+  </script>
+</body>
+</html>
